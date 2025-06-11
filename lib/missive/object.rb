@@ -19,6 +19,10 @@ module Missive
       attributes.dig(*keys)
     end
 
+    def [](key)
+      attributes[key.to_sym]
+    end
+
     def reload!
       return self unless self_link
 

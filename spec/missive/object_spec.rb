@@ -93,6 +93,26 @@ RSpec.describe Missive::Object do
     end
   end
 
+  describe "#[]" do
+    it "provides hash-style access to attributes" do
+      attributes = { id: "123", name: "Test" }
+      obj = described_class.new(attributes)
+      expect(obj[:id]).to eq("123")
+      expect(obj[:name]).to eq("Test")
+    end
+
+    it "converts string keys to symbols" do
+      attributes = { email: "test@example.com" }
+      obj = described_class.new(attributes)
+      expect(obj["email"]).to eq("test@example.com")
+    end
+
+    it "returns nil for non-existent keys" do
+      obj = described_class.new({})
+      expect(obj[:nonexistent]).to be_nil
+    end
+  end
+
   describe "#reload!" do
     context "when self link is present" do
       let(:attributes_with_link) do

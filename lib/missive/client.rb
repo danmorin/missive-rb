@@ -29,5 +29,17 @@ module Missive
     def analytics
       @analytics ||= Missive::Resources::Analytics.new(self)
     end
+
+    def contacts
+      @contacts ||= Missive::Resources::Contacts.new(self)
+    end
+
+    def contact_books
+      @contact_books ||= Missive::Resources::ContactBooks.new(self)
+    end
+
+    def contact_groups
+      @contact_groups ||= Missive::Resources::ContactGroups.new(self)
+    end
   end
 end

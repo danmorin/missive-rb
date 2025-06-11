@@ -175,8 +175,8 @@ RSpec.describe Missive do
 
       it "references constants through full module path" do
         # Temporarily remove the constant from local scope to test full qualification
-        expect(defined?(Constants)).to be_falsy  # Should not be available without Missive::
-        
+        expect(defined?(Constants)).to be_falsy # Should not be available without Missive::
+
         # This ensures the code uses Missive::Constants::BASE_URL, not Constants::BASE_URL
         client = Missive::Client.new(api_token: "test_token")
         expect(client.config[:base_url]).to eq("https://public-api.missiveapp.com/v1")
@@ -241,10 +241,10 @@ RSpec.describe Missive do
 
       it "uses hash access operator (not fetch) for config values" do
         client = Missive::Client.new(api_token: "test_token", custom_option: "value")
-        
+
         # Verify that missing keys return nil (hash access behavior, not fetch)
         expect(client.config[:nonexistent_key]).to be_nil
-        
+
         # This would raise KeyError if fetch were used instead of []
         expect { client.connection }.not_to raise_error
       end
@@ -475,7 +475,7 @@ RSpec.describe Missive do
 
       it "initializes token_lookup as lambda that accepts email parameter" do
         config = Missive::Configuration.new
-        expect(config.token_lookup.arity).to eq(1)  # Should accept exactly 1 parameter
+        expect(config.token_lookup.arity).to eq(1) # Should accept exactly 1 parameter
         expect(config.token_lookup.call("any@email.com")).to be_nil
       end
 

@@ -4,8 +4,10 @@ module Missive
   class Error < StandardError
     def self.from_status(status, _body)
       case status
-      when 401
+      when 401, 403
         AuthenticationError
+      when 404
+        NotFoundError
       when 429
         RateLimitError
       when 500..599
@@ -23,6 +25,9 @@ module Missive
   end
 
   class AuthenticationError < Error
+  end
+
+  class NotFoundError < Error
   end
 
   class RateLimitError < Error

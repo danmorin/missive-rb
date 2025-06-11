@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = "A Ruby gem that provides a simple interface to interact with the Missive API for team email management"
   spec.homepage = "https://github.com/danmorin/missive-rb"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.1.0"
+  spec.required_ruby_version = ">= 3.2.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/danmorin/missive-rb"
@@ -32,6 +32,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   # Dependencies
+  spec.add_dependency "activesupport", ">= 7.0"
   spec.add_dependency "concurrent-ruby", "~> 1.2"
   spec.add_dependency "faraday", "~> 2.0"
   spec.add_dependency "faraday-retry", "~> 2.0"

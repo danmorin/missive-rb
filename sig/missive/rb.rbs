@@ -1,6 +1,17 @@
 module Missive
-  module Rb
-    VERSION: String
-    # See the writing guide of rbs: https://github.com/ruby/rbs#guides
+  VERSION: String
+  
+  class Configuration
+    attr_accessor logger: Logger
+    attr_accessor instrumenter: untyped
+    attr_accessor token_lookup: ^(String) -> String?
+    attr_accessor base_url: String
+    attr_accessor soft_limit_threshold: Integer
+    
+    def initialize: () -> void
   end
+  
+  def self.configure: () { (Configuration) -> void } -> Configuration
+  def self.configuration: () -> Configuration
+  def self.reset_configuration!: () -> nil
 end

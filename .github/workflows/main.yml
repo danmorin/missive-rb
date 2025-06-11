@@ -1,19 +1,20 @@
-name: Ruby
+name: CI
 
 on:
   push:
     branches:
       - main
-
   pull_request:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     name: Ruby ${{ matrix.ruby }}
     strategy:
       matrix:
         ruby:
+          - '3.2'
+          - '3.3'
           - '3.4.4'
 
     steps:
@@ -23,5 +24,13 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-      - name: Run the default task
-        run: bundle exec rake
+      
+      - name: Run linter
+        run: bundle exec rubocop
+      
+      - name: Run tests
+        run: bundle exec rspec
+        
+      - name: Run mutation tests (Ruby 3.3+)
+        if: matrix.ruby >= '3.3'
+        run: bundle exec mutant run --since HEAD~1 --fail-fast

@@ -1,0 +1,8 @@
+integration: rspec
+matcher:
+  subject: "Missive*"
+mutation_timeout: 20.0
+coverage_criteria:
+  line: 100.0
+  branch: 95.0
+  mutation: 95.0

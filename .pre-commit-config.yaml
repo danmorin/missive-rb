@@ -1,0 +1,16 @@
+repos:
+  - repo: local
+    hooks:
+      - id: rubocop
+        name: RuboCop
+        entry: bundle exec rubocop
+        language: system
+        files: \.rb$
+        args: [-A]
+      - id: rspec
+        name: RSpec
+        entry: bundle exec rspec
+        language: system
+        files: \.rb$
+        args: [--fail-fast]
+        pass_filenames: false

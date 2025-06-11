@@ -21,8 +21,7 @@ module Missive
         token: token,
         base_url: config[:base_url],
         timeout: config[:timeout],
-        logger: config[:logger],
-        rate_limit_tokens: config[:rate_limit_tokens] || 300
+        logger: config[:logger]
       )
     end
   end

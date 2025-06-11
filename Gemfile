@@ -15,3 +15,5 @@ gem "webmock", "~> 3.18"
 
 gem "rubocop", "~> 1.21"
 gem "rubocop-rails", "~> 2.15"
+
+gem "mutant-rspec", "~> 0.11"

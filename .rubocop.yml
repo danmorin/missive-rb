@@ -65,3 +65,12 @@ Style/MultilineBlockChain:
 Style/SingleArgumentDig:
   Exclude:
     - "spec/**/*"
+
+# Allow intentional test patterns in paginator specs
+Lint/UnreachableLoop:
+  Exclude:
+    - "spec/missive/paginator_spec.rb"
+
+Lint/EmptyBlock:
+  Exclude:
+    - "spec/missive/paginator_spec.rb"

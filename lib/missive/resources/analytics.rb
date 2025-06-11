@@ -50,12 +50,12 @@ module Missive
         raise ArgumentError, "start_time is required" if start_time.nil?
         raise ArgumentError, "end_time is required" if end_time.nil?
 
-        payload = { 
-          reports: { 
-            organization: organization, 
-            start: start_time, 
-            end: end_time 
-          }.merge(params) 
+        payload = {
+          reports: {
+            organization: organization,
+            start: start_time,
+            end: end_time
+          }.merge(params)
         }
 
         ActiveSupport::Notifications.instrument("missive.analytics.create_report") do

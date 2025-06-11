@@ -13,12 +13,12 @@ module Missive
       secure_compare(expected, header)
     end
 
-    private_class_method def self.secure_compare(a, b)
-      return false unless a.bytesize == b.bytesize
+    private_class_method def self.secure_compare(signature_a, signature_b)
+      return false unless signature_a.bytesize == signature_b.bytesize
 
-      l = a.unpack("C*")
+      l = signature_a.unpack("C*")
       res = 0
-      b.each_byte { |byte| res |= byte ^ l.shift }
+      signature_b.each_byte { |byte| res |= byte ^ l.shift }
       res.zero?
     end
   end

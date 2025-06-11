@@ -19,24 +19,26 @@ RSpec.describe Missive::Resources::Analytics do
   end
 
   describe "#create_report" do
-    let(:report_data) { { reports: { "id" => "report123", "organization" => "0d9bab85-a74f-4ece-9142-0f9b9f36ff92", "status" => "pending" } } }
+    let(:report_data) do
+      { reports: { "id" => "report123", "organization" => "0d9bab85-a74f-4ece-9142-0f9b9f36ff92", "status" => "pending" } }
+    end
 
     it "sends POST request with correct payload" do
       expected_payload = {
         reports: {
           organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92",
-          start: 1691812800,
-          end: 1692371867
+          start: 1_691_812_800,
+          end: 1_692_371_867
         }
       }
-      
+
       allow(connection).to receive(:request).with(:post, "/analytics/reports",
                                                   body: expected_payload).and_return(report_data)
 
       result = analytics.create_report(
         organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92",
-        start_time: 1691812800,
-        end_time: 1692371867
+        start_time: 1_691_812_800,
+        end_time: 1_692_371_867
       )
 
       expect(connection).to have_received(:request).with(:post, "/analytics/reports",
@@ -49,20 +51,20 @@ RSpec.describe Missive::Resources::Analytics do
       expected_payload = {
         reports: {
           organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92",
-          start: 1691812800,
-          end: 1692371867,
+          start: 1_691_812_800,
+          end: 1_692_371_867,
           time_zone: "America/Montreal",
           teams: ["team1"]
         }
       }
-      
+
       allow(connection).to receive(:request).with(:post, "/analytics/reports",
                                                   body: expected_payload).and_return(report_data)
 
       analytics.create_report(
         organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92",
-        start_time: 1691812800,
-        end_time: 1692371867,
+        start_time: 1_691_812_800,
+        end_time: 1_692_371_867,
         time_zone: "America/Montreal",
         teams: ["team1"]
       )
@@ -72,38 +74,38 @@ RSpec.describe Missive::Resources::Analytics do
     end
 
     it "raises ArgumentError when organization is nil" do
-      expect {
-        analytics.create_report(organization: nil, start_time: 1691812800, end_time: 1692371867)
-      }.to raise_error(ArgumentError, "organization is required")
+      expect do
+        analytics.create_report(organization: nil, start_time: 1_691_812_800, end_time: 1_692_371_867)
+      end.to raise_error(ArgumentError, "organization is required")
     end
 
     it "raises ArgumentError when organization is empty" do
-      expect {
-        analytics.create_report(organization: "", start_time: 1691812800, end_time: 1692371867)
-      }.to raise_error(ArgumentError, "organization is required")
+      expect do
+        analytics.create_report(organization: "", start_time: 1_691_812_800, end_time: 1_692_371_867)
+      end.to raise_error(ArgumentError, "organization is required")
     end
 
     it "raises ArgumentError when start_time is nil" do
-      expect {
-        analytics.create_report(organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92", start_time: nil, end_time: 1692371867)
-      }.to raise_error(ArgumentError, "start_time is required")
+      expect do
+        analytics.create_report(organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92", start_time: nil, end_time: 1_692_371_867)
+      end.to raise_error(ArgumentError, "start_time is required")
     end
 
     it "raises ArgumentError when end_time is nil" do
-      expect {
-        analytics.create_report(organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92", start_time: 1691812800, end_time: nil)
-      }.to raise_error(ArgumentError, "end_time is required")
+      expect do
+        analytics.create_report(organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92", start_time: 1_691_812_800, end_time: nil)
+      end.to raise_error(ArgumentError, "end_time is required")
     end
 
     it "emits missive.analytics.create_report notification" do
       expected_payload = {
         reports: {
           organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92",
-          start: 1691812800,
-          end: 1692371867
+          start: 1_691_812_800,
+          end: 1_692_371_867
         }
       }
-      
+
       allow(connection).to receive(:request).with(:post, "/analytics/reports",
                                                   body: expected_payload).and_return(report_data)
 
@@ -114,8 +116,8 @@ RSpec.describe Missive::Resources::Analytics do
 
       analytics.create_report(
         organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92",
-        start_time: 1691812800,
-        end_time: 1692371867
+        start_time: 1_691_812_800,
+        end_time: 1_692_371_867
       )
 
       expect(notifications).not_to be_empty
@@ -125,13 +127,13 @@ RSpec.describe Missive::Resources::Analytics do
     it "handles server errors by letting them bubble up" do
       allow(connection).to receive(:request).and_raise(Missive::ServerError.new("Bad Request"))
 
-      expect {
+      expect do
         analytics.create_report(
           organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92",
-          start_time: 1691812800,
-          end_time: 1692371867
+          start_time: 1_691_812_800,
+          end_time: 1_692_371_867
         )
-      }.to raise_error(Missive::ServerError)
+      end.to raise_error(Missive::ServerError)
     end
 
     it "flattens nested reports structure for easier access" do
@@ -141,8 +143,8 @@ RSpec.describe Missive::Resources::Analytics do
 
       result = analytics.create_report(
         organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92",
-        start_time: 1691812800,
-        end_time: 1692371867
+        start_time: 1_691_812_800,
+        end_time: 1_692_371_867
       )
 
       expect(result.id).to eq("report123")
@@ -156,8 +158,8 @@ RSpec.describe Missive::Resources::Analytics do
 
       result = analytics.create_report(
         organization: "0d9bab85-a74f-4ece-9142-0f9b9f36ff92",
-        start_time: 1691812800,
-        end_time: 1692371867
+        start_time: 1_691_812_800,
+        end_time: 1_692_371_867
       )
 
       expect(result.id).to eq("report456")
@@ -226,26 +228,24 @@ RSpec.describe Missive::Resources::Analytics do
   end
 
   describe "#wait_for_report" do
-    let(:completed_report_data) { { "start" => 1691812800, "end" => 1692371867, "metrics" => {} } }
+    let(:completed_report_data) { { "start" => 1_691_812_800, "end" => 1_692_371_867, "metrics" => {} } }
 
     it "polls until report data is available" do
       Timecop.freeze do
         call_count = 0
         allow(analytics).to receive(:get_report).with(report_id: "report123") do
           call_count += 1
-          if call_count < 3
-            raise Missive::NotFoundError, "Report not ready"
-          else
-            Missive::Object.new(completed_report_data)
-          end
+          raise Missive::NotFoundError, "Report not ready" if call_count < 3
+
+          Missive::Object.new(completed_report_data)
         end
         allow(analytics).to receive(:wait_interval)
 
         result = analytics.wait_for_report(report_id: "report123", interval: 0.01)
 
         expect(analytics).to have_received(:get_report).exactly(3).times
-        expect(result.start).to eq(1691812800)
-        expect(result.end).to eq(1692371867)
+        expect(result.start).to eq(1_691_812_800)
+        expect(result.end).to eq(1_692_371_867)
       end
     end
 
@@ -254,11 +254,9 @@ RSpec.describe Missive::Resources::Analytics do
         call_count = 0
         allow(analytics).to receive(:get_report).with(report_id: "report123") do
           call_count += 1
-          if call_count < 2
-            raise Missive::NotFoundError, "Report not ready"
-          else
-            Missive::Object.new(completed_report_data)
-          end
+          raise Missive::NotFoundError, "Report not ready" if call_count < 2
+
+          Missive::Object.new(completed_report_data)
         end
         allow(analytics).to receive(:wait_interval)
 
@@ -292,11 +290,9 @@ RSpec.describe Missive::Resources::Analytics do
         call_count = 0
         allow(analytics).to receive(:get_report).with(report_id: "report123") do
           call_count += 1
-          if call_count < 2
-            raise Missive::NotFoundError, "Report not ready"
-          else
-            Missive::Object.new(completed_report_data)
-          end
+          raise Missive::NotFoundError, "Report not ready" if call_count < 2
+
+          Missive::Object.new(completed_report_data)
         end
         allow(analytics).to receive(:wait_interval)
 
@@ -320,7 +316,7 @@ RSpec.describe Missive::Resources::Analytics do
 
         result = analytics.wait_for_report(report_id: "report123")
 
-        expect(result.start).to eq(1691812800)
+        expect(result.start).to eq(1_691_812_800)
       end
     end
 
@@ -334,7 +330,7 @@ RSpec.describe Missive::Resources::Analytics do
 
         expect(analytics).to have_received(:get_report).once
         expect(analytics).not_to have_received(:wait_interval)
-        expect(result.start).to eq(1691812800)
+        expect(result.start).to eq(1_691_812_800)
       end
     end
 
@@ -343,11 +339,9 @@ RSpec.describe Missive::Resources::Analytics do
         call_count = 0
         allow(analytics).to receive(:get_report).with(report_id: "report123") do
           call_count += 1
-          if call_count < 2
-            raise Missive::NotFoundError, "Report not ready"
-          else
-            Missive::Object.new(completed_report_data)
-          end
+          raise Missive::NotFoundError, "Report not ready" if call_count < 2
+
+          Missive::Object.new(completed_report_data)
         end
         # Don't mock wait_interval, but mock the actual sleep method
         allow(analytics).to receive(:sleep)

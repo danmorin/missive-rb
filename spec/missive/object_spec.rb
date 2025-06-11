@@ -72,7 +72,7 @@ RSpec.describe Missive::Object do
       # Create an object that raises an error when dup is called
       error_object = Object.new
       allow(error_object).to receive(:dup).and_raise(StandardError, "Cannot dup")
-      
+
       attributes_with_error_object = { "id" => 123, "special" => error_object }
       object = described_class.new(attributes_with_error_object, client)
       result = object.to_h
@@ -210,9 +210,9 @@ RSpec.describe Missive::Object do
     end
 
     it "handles complex underscore conversions" do
-      # Test edge cases in the underscore method  
-      camel_attributes = { 
-        "XMLParser" => "value1", 
+      # Test edge cases in the underscore method
+      camel_attributes = {
+        "XMLParser" => "value1",
         "HTTPSConnection" => "value2",
         "APIKey" => "value3",
         "some-dashed-key" => "value4",
@@ -222,7 +222,7 @@ RSpec.describe Missive::Object do
 
       # Test the underscore conversion for complex cases
       expect(object.xml_parser).to eq("value1")
-      expect(object.https_connection).to eq("value2") 
+      expect(object.https_connection).to eq("value2")
       expect(object.api_key).to eq("value3")
       expect(object.some_dashed_key).to eq("value4")
       expect(object.mixed_case_with_lower_start).to eq("value6")

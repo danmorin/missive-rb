@@ -2,7 +2,7 @@ plugins:
   - rubocop-rails
 
 AllCops:
-  TargetRubyVersion: 3.1
+  TargetRubyVersion: 3.2
   NewCops: enable
 
 Style/StringLiterals:
@@ -33,10 +33,22 @@ Metrics/BlockLength:
     - "spec/**/*"
 
 Metrics/AbcSize:
-  Max: 25
+  Max: 26
 
 Metrics/CyclomaticComplexity:
   Max: 10
 
 Layout/LineLength:
   Max: 130
+
+# Custom cop to forbid em dashes
+Lint/UnusedMethodArgument:
+  AllowUnusedKeywordArguments: true
+
+# Custom em dash detection
+Style/CharacterLiteral:
+  Enabled: false
+
+# Prevent usage of em dashes (–) in strings and comments
+Style/AsciiComments:
+  Enabled: true

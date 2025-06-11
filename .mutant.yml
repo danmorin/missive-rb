@@ -1,0 +1,12 @@
+usage: opensource
+integration:
+  name: rspec
+includes:
+  - lib
+requires:
+  - missive
+matcher:
+  subjects:
+    - "Missive*"
+mutation:
+  timeout: 20.0

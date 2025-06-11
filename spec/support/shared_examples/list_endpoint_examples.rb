@@ -101,9 +101,9 @@ RSpec.shared_examples "a paginated list endpoint" do
     allow(connection).to receive(:request).and_return(empty_response)
 
     if defined?(required_params) && required_params.any?
-      subject.each_item(**required_params) { |_| }
+      subject.each_item(**required_params) { |_| } # rubocop:disable Lint/EmptyBlock
     else
-      subject.each_item { |_| }
+      subject.each_item { |_| } # rubocop:disable Lint/EmptyBlock
     end
 
     expect(connection).to have_received(:request).with(
@@ -115,7 +115,7 @@ RSpec.shared_examples "a paginated list endpoint" do
   it "raises ArgumentError when limit exceeds 200" do
     args = defined?(required_params) ? required_params.merge(limit: 201) : { limit: 201 }
     expect do
-      subject.each_item(**args) { |_| }
+      subject.each_item(**args) { |_| } # rubocop:disable Lint/EmptyBlock
     end.to raise_error(ArgumentError, "limit cannot exceed 200")
   end
 

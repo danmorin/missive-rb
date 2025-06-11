@@ -26,6 +26,8 @@ Style/Documentation:
 # Allow longer methods and blocks for setup code
 Metrics/MethodLength:
   Max: 20
+  Exclude:
+    - "lib/missive/paginator.rb" # Complex pagination logic
 
 Metrics/BlockLength:
   Max: 50
@@ -34,9 +36,21 @@ Metrics/BlockLength:
 
 Metrics/AbcSize:
   Max: 26
+  Exclude:
+    - "lib/missive/paginator.rb" # Complex pagination logic
 
 Metrics/CyclomaticComplexity:
   Max: 10
+  Exclude:
+    - "lib/missive/paginator.rb" # Complex pagination logic
+    - "lib/missive/resources/contacts.rb" # Validation logic
+
+Metrics/PerceivedComplexity:
+  Max: 8
+  Exclude:
+    - "lib/missive/paginator.rb" # Complex pagination logic
+    - "lib/missive/resources/contact_groups.rb" # Validation logic
+    - "lib/missive/resources/contacts.rb" # Validation logic
 
 Layout/LineLength:
   Max: 130

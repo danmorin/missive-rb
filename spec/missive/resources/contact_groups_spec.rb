@@ -126,19 +126,19 @@ RSpec.describe Missive::Resources::ContactGroups do
 
     it "raises ArgumentError when contact_book is missing" do
       expect do
-        contact_groups.each_item(kind: "group") { |_| }
+        contact_groups.each_item(kind: "group") { |_| } # rubocop:disable Lint/EmptyBlock
       end.to raise_error(ArgumentError, "contact_book is required")
     end
 
     it "raises ArgumentError when kind is missing" do
       expect do
-        contact_groups.each_item(contact_book: contact_book_id) { |_| }
+        contact_groups.each_item(contact_book: contact_book_id) { |_| } # rubocop:disable Lint/EmptyBlock
       end.to raise_error(ArgumentError, "kind is required")
     end
 
     it "raises ArgumentError when kind is invalid" do
       expect do
-        contact_groups.each_item(contact_book: contact_book_id, kind: "invalid") { |_| }
+        contact_groups.each_item(contact_book: contact_book_id, kind: "invalid") { |_| } # rubocop:disable Lint/EmptyBlock
       end.to raise_error(ArgumentError, "kind must be 'group' or 'organization'")
     end
   end

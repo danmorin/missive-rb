@@ -139,6 +139,7 @@ GEM
     simplecov_json_formatter (0.1.4)
     sorbet-runtime (0.5.12167)
     stringio (3.1.7)
+    timecop (0.9.10)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     unicode-display_width (3.1.4)
@@ -167,6 +168,7 @@ DEPENDENCIES
   rubocop (~> 1.21)
   rubocop-rails (~> 2.15)
   simplecov (~> 0.22)
+  timecop (~> 0.9)
   webmock (~> 3.18)
 
 BUNDLED WITH

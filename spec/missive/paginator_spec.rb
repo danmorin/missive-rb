@@ -1,0 +1,157 @@
+# frozen_string_literal: true
+
+require "spec_helper"
+require "webmock/rspec"
+
+RSpec.describe Missive::Paginator do
+  let(:client) { instance_double("Missive::Client") }
+  let(:connection) { instance_double("Missive::Connection") }
+
+  before do
+    allow(client).to receive(:connection).and_return(connection)
+  end
+
+  shared_examples "a paginator" do |transcript|
+    let(:path) { "/test" }
+    let(:params) { {} }
+    let(:pages) { transcript }
+
+    before do
+      pages.each_with_index do |page_data, index|
+        url = if index == 0
+                path
+              else
+                "#{path}?until=#{pages[index - 1]["next"]["until"]}"
+              end
+
+        allow(connection).to receive(:request).with(:get, url).and_return(page_data)
+      end
+    end
+
+    describe ".each_page" do
+      it "hits correct initial URL" do
+        described_class.each_page(path: path, params: params, client: client) { |_page| break }
+        expect(connection).to have_received(:request).with(:get, path)
+      end
+
+      it "continues until next.until missing" do
+        page_count = 0
+        described_class.each_page(path: path, params: params, client: client) do |_page|
+          page_count += 1
+        end
+        expect(page_count).to eq(pages.length)
+      end
+
+      it "yields correct count of pages" do
+        yielded_pages = []
+        described_class.each_page(path: path, params: params, client: client) do |page|
+          yielded_pages << page
+        end
+        expect(yielded_pages.length).to eq(pages.length)
+      end
+
+      it "honors max_pages" do
+        max_pages = 1
+        page_count = 0
+        described_class.each_page(path: path, params: params, client: client, max_pages: max_pages) do |_page|
+          page_count += 1
+        end
+        expect(page_count).to eq(max_pages)
+      end
+
+      it "emits missive.paginator.page notification" do
+        notifications = []
+        ActiveSupport::Notifications.subscribe("missive.paginator.page") do |_name, _start, _finish, _id, payload|
+          notifications << payload
+        end
+
+        described_class.each_page(path: path, params: params, client: client) { |_page| break }
+
+        expect(notifications).not_to be_empty
+        expect(notifications.first).to include(page_number: 1, url: path)
+      end
+
+      it "respects sleep_interval" do
+        allow(described_class).to receive(:sleep)
+        described_class.each_page(path: path, params: params, client: client, sleep_interval: 0.1) { |_page| }
+        expect(described_class).to have_received(:sleep).with(0.1).at_least(:once) if pages.length > 1
+      end
+
+      it "builds correct URL with params" do
+        initial_params = { limit: 10 }
+        allow(connection).to receive(:request).with(:get, "/test?limit=10").and_return(pages.first)
+
+        described_class.each_page(path: path, params: initial_params, client: client) { |_page| break }
+        expect(connection).to have_received(:request).with(:get, "/test?limit=10")
+      end
+
+      it "does not sleep when interval is zero" do
+        allow(described_class).to receive(:sleep)
+        described_class.each_page(path: path, params: params, client: client, sleep_interval: 0) { |_page| }
+        expect(described_class).not_to have_received(:sleep)
+      end
+
+      it "does not sleep when interval is negative" do
+        allow(described_class).to receive(:sleep)
+        described_class.each_page(path: path, params: params, client: client, sleep_interval: -1) { |_page| }
+        expect(described_class).not_to have_received(:sleep)
+      end
+    end
+
+    describe ".each_item" do
+      it "flattens data array and yields individual items" do
+        items = []
+        described_class.each_item(path: path, params: params, client: client) do |item|
+          items << item
+        end
+
+        expected_items = pages.flat_map { |page| page["data"] || [] }
+        expect(items).to eq(expected_items)
+      end
+
+      it "honors max_items" do
+        max_items = 1
+        items = []
+        described_class.each_item(path: path, params: params, client: client, max_items: max_items) do |item|
+          items << item
+        end
+        expect(items.length).to eq(max_items)
+      end
+    end
+  end
+
+  context "with single page transcript" do
+    include_examples "a paginator", [
+      {
+        "data" => [
+          { "id" => 1, "name" => "Item 1" },
+          { "id" => 2, "name" => "Item 2" }
+        ]
+      }
+    ]
+  end
+
+  context "with multi-page transcript" do
+    include_examples "a paginator", [
+      {
+        "data" => [
+          { "id" => 1, "name" => "Item 1" },
+          { "id" => 2, "name" => "Item 2" }
+        ],
+        "next" => { "until" => "token1" }
+      },
+      {
+        "data" => [
+          { "id" => 3, "name" => "Item 3" },
+          { "id" => 4, "name" => "Item 4" }
+        ],
+        "next" => { "until" => "token2" }
+      },
+      {
+        "data" => [
+          { "id" => 5, "name" => "Item 5" }
+        ]
+      }
+    ]
+  end
+end

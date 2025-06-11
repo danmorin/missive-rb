@@ -33,4 +33,4 @@ jobs:
         
       - name: Run mutation tests (Ruby 3.3+)
         if: matrix.ruby >= '3.3'
-        run: bundle exec mutant run --fail-fast --max-runtime 30
+        run: timeout 300 bundle exec mutant run --fail-fast -t 5

@@ -1,28 +1,41 @@
-# Missive::Rb
+# Missive Ruby Client
 
-TODO: Delete this and the text below, and describe your gem
-
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/missive/rb`. To experiment with that code, run `bin/console` for an interactive prompt.
+A Ruby client library for the Missive API, providing thread-safe connection management, rate limiting, and comprehensive error handling.
 
 ## Installation
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
+Add this line to your application's Gemfile:
 
-Install the gem and add to the application's Gemfile by executing:
-
-```bash
-bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+```ruby
+gem 'missive-rb'
 ```
 
-If bundler is not being used to manage dependencies, install the gem by executing:
+And then execute:
 
 ```bash
-gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+bundle install
+```
+
+Or install it yourself as:
+
+```bash
+gem install missive-rb
 ```
 
 ## Usage
 
-TODO: Write usage instructions here
+Here's a minimal example to get started:
+
+```ruby
+require 'missive'
+
+# Initialize the client with your API token
+client = Missive::Client.new(api_token: 'your_api_token_here')
+
+# Make a simple ping request
+response = client.connection.request(:get, '/ping')
+puts response # => { status: "ok" }
+```
 
 ## Development
 

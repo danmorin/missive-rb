@@ -1,8 +1,42 @@
+plugins:
+  - rubocop-rails
+
 AllCops:
   TargetRubyVersion: 3.1
+  NewCops: enable
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes
 
 Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
+
+# Bundler adds frozen_string_literal automatically
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+# This is not a Rails app, Time.now is fine
+Rails/TimeZone:
+  Enabled: false
+
+# Documentation not required for this gem
+Style/Documentation:
+  Enabled: false
+
+# Allow longer methods and blocks for setup code
+Metrics/MethodLength:
+  Max: 20
+
+Metrics/BlockLength:
+  Max: 50
+  Exclude:
+    - "spec/**/*"
+
+Metrics/AbcSize:
+  Max: 25
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Layout/LineLength:
+  Max: 130

@@ -1,6 +1,13 @@
 # frozen_string_literal: true
 
-require "missive/rb"
+require "simplecov"
+SimpleCov.start do
+  minimum_coverage 100
+end
+
+require "missive"
+require "webmock/rspec"
+require "concurrent"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

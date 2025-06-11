@@ -2,7 +2,7 @@
 
 module Missive
   module Constants
-    BASE_URL = "https://public-api.missiveapp.com/v1"
+    BASE_URL = "https://public.missiveapp.com/v1"
     MAX_CONCURRENCY = 5
     RATE_60S = 300
     RATE_15M = 900

@@ -52,3 +52,25 @@ Style/CharacterLiteral:
 # Prevent usage of em dashes (–) in strings and comments
 Style/AsciiComments:
   Enabled: true
+
+# This is not a Rails app, blank? method is not available
+Rails/Blank:
+  Enabled: false
+
+# Allow multi-line block chains for instrumentation patterns
+Style/MultilineBlockChain:
+  Enabled: false
+
+# Allow single argument dig in tests to verify dig method functionality
+Style/SingleArgumentDig:
+  Exclude:
+    - "spec/**/*"
+
+# Allow intentional test patterns in paginator specs
+Lint/UnreachableLoop:
+  Exclude:
+    - "spec/missive/paginator_spec.rb"
+
+Lint/EmptyBlock:
+  Exclude:
+    - "spec/missive/paginator_spec.rb"

@@ -11,6 +11,7 @@ gem "rake", "~> 13.0"
 gem "concurrent-ruby", "~> 1.2"
 gem "rspec", "~> 3.0"
 gem "simplecov", "~> 0.22"
+gem "timecop", "~> 0.9"
 gem "webmock", "~> 3.18"
 
 gem "rubocop", "~> 1.21"

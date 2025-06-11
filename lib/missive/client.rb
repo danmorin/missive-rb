@@ -4,6 +4,7 @@ require "missive/version"
 require "missive/constants"
 require "missive/connection"
 require "missive/error"
+require "missive/resources/analytics"
 
 module Missive
   class Client
@@ -23,6 +24,10 @@ module Missive
         timeout: config[:timeout],
         logger: config[:logger]
       )
+    end
+
+    def analytics
+      @analytics ||= Missive::Resources::Analytics.new(self)
     end
   end
 end

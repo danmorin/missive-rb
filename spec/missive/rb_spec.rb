@@ -179,7 +179,7 @@ RSpec.describe Missive do
 
         # This ensures the code uses Missive::Constants::BASE_URL, not Constants::BASE_URL
         client = Missive::Client.new(api_token: "test_token")
-        expect(client.config[:base_url]).to eq("https://public-api.missiveapp.com/v1")
+        expect(client.config[:base_url]).to eq("https://public.missiveapp.com/v1")
       end
 
       it "allows custom base_url" do
@@ -247,6 +247,22 @@ RSpec.describe Missive do
 
         # This would raise KeyError if fetch were used instead of []
         expect { client.connection }.not_to raise_error
+      end
+    end
+
+    describe "#analytics" do
+      it "memoizes the analytics resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        analytics1 = client.analytics
+        analytics2 = client.analytics
+        expect(analytics1).to be(analytics2)
+      end
+
+      it "creates Analytics resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        analytics = client.analytics
+        expect(analytics).to be_a(Missive::Resources::Analytics)
+        expect(analytics.instance_variable_get(:@client)).to eq(client)
       end
     end
 
@@ -481,7 +497,7 @@ RSpec.describe Missive do
 
       it "uses fully qualified constant reference for default base_url" do
         config = Missive::Configuration.new
-        expect(config.base_url).to eq("https://public-api.missiveapp.com/v1")
+        expect(config.base_url).to eq("https://public.missiveapp.com/v1")
         expect(config.base_url).to eq(Missive::Constants::BASE_URL)
       end
 

@@ -62,6 +62,9 @@ module Missive
     public
 
     def request(method, path, params: {}, body: nil)
+      # Strip leading slash to prevent Faraday from treating it as absolute path
+      path = path.sub(%r{^/}, "") if path.start_with?("/")
+
       response = connection.public_send(method, path) do |req|
         req.params = params if params.any?
         req.body = body if body

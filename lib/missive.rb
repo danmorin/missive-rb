@@ -2,6 +2,9 @@
 
 require "missive/configuration"
 require "missive/client"
+require "missive/paginator"
+require "missive/object"
+require "missive/signature"
 
 module Missive
   class << self

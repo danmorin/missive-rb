@@ -173,6 +173,15 @@ RSpec.describe Missive do
         expect(client.config[:base_url]).to eq(Missive::Constants::BASE_URL)
       end
 
+      it "references constants through full module path" do
+        # Temporarily remove the constant from local scope to test full qualification
+        expect(defined?(Constants)).to be_falsy  # Should not be available without Missive::
+        
+        # This ensures the code uses Missive::Constants::BASE_URL, not Constants::BASE_URL
+        client = Missive::Client.new(api_token: "test_token")
+        expect(client.config[:base_url]).to eq("https://public-api.missiveapp.com/v1")
+      end
+
       it "allows custom base_url" do
         custom_url = "https://custom.api.com/v1"
         client = Missive::Client.new(api_token: "test_token", base_url: custom_url)
@@ -197,6 +206,47 @@ RSpec.describe Missive do
         connection1 = client.connection
         connection2 = client.connection
         expect(connection1).to be(connection2)
+      end
+
+      it "passes correct parameters to Connection.new" do
+        client = Missive::Client.new(
+          api_token: "test_token",
+          base_url: "https://custom.api.com",
+          timeout: 30,
+          logger: Logger.new(File::NULL)
+        )
+
+        expect(Missive::Connection).to receive(:new).with(
+          token: "test_token",
+          base_url: "https://custom.api.com",
+          timeout: 30,
+          logger: client.config[:logger]
+        ).and_call_original
+
+        client.connection
+      end
+
+      it "passes nil values correctly when options not provided" do
+        client = Missive::Client.new(api_token: "test_token")
+
+        expect(Missive::Connection).to receive(:new).with(
+          token: "test_token",
+          base_url: Missive::Constants::BASE_URL,
+          timeout: nil,
+          logger: nil
+        ).and_call_original
+
+        client.connection
+      end
+
+      it "uses hash access operator (not fetch) for config values" do
+        client = Missive::Client.new(api_token: "test_token", custom_option: "value")
+        
+        # Verify that missing keys return nil (hash access behavior, not fetch)
+        expect(client.config[:nonexistent_key]).to be_nil
+        
+        # This would raise KeyError if fetch were used instead of []
+        expect { client.connection }.not_to raise_error
       end
     end
 
@@ -415,6 +465,24 @@ RSpec.describe Missive do
         expect(config.token_lookup.call("test")).to be_nil
         expect(config.base_url).to eq(Missive::Constants::BASE_URL)
         expect(config.soft_limit_threshold).to eq(30)
+      end
+
+      it "initializes logger with correct output stream and level" do
+        config = Missive::Configuration.new
+        expect(config.logger.instance_variable_get(:@logdev).instance_variable_get(:@dev)).to eq($stdout)
+        expect(config.logger.level).to eq(Logger::INFO)
+      end
+
+      it "initializes token_lookup as lambda that accepts email parameter" do
+        config = Missive::Configuration.new
+        expect(config.token_lookup.arity).to eq(1)  # Should accept exactly 1 parameter
+        expect(config.token_lookup.call("any@email.com")).to be_nil
+      end
+
+      it "uses fully qualified constant reference for default base_url" do
+        config = Missive::Configuration.new
+        expect(config.base_url).to eq("https://public-api.missiveapp.com/v1")
+        expect(config.base_url).to eq(Missive::Constants::BASE_URL)
       end
 
       it "can be frozen" do

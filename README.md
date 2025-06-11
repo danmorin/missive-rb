@@ -2,6 +2,13 @@
 
 A Ruby client library for the Missive API, providing thread-safe connection management, rate limiting, and comprehensive error handling.
 
+## Resources Implemented
+
+- **Analytics** - Create and retrieve analytics reports
+- **Contacts** - Create, update, list, and retrieve contacts  
+- **Contact Books** - List available contact books
+- **Contact Groups** - List groups and organizations within contact books
+
 ## Installation
 
 Add this line to your application's Gemfile:
@@ -70,6 +77,79 @@ You can also manually fetch a completed report:
 report = client.analytics.get_report(report_id: 'abc123')
 puts "Report start: #{report.start}"
 puts "Report end: #{report.end}"
+```
+
+### Contacts Management
+
+The Contacts API allows you to create, update, list, and retrieve contacts:
+
+```ruby
+# List contacts from a contact book
+contacts = client.contacts.list(
+  contact_book: "book-id-here",
+  limit: 10
+)
+
+# Create a new contact
+new_contact = client.contacts.create(
+  contacts: {
+    email: "john@example.com",
+    first_name: "John",
+    last_name: "Doe",
+    contact_book: "book-id-here"
+  }
+)
+
+# Update existing contacts
+updated = client.contacts.update(
+  contact_hashes: [
+    { id: "contact-id-1", first_name: "Jane" },
+    { id: "contact-id-2", last_name: "Smith" }
+  ]
+)
+
+# Get a specific contact
+contact = client.contacts.get(id: "contact-id-here")
+puts "#{contact.first_name} #{contact.last_name}"
+
+# Iterate through all contacts with pagination
+client.contacts.each_item(contact_book: "book-id-here") do |contact|
+  puts "#{contact.email} - #{contact.first_name} #{contact.last_name}"
+end
+```
+
+### Contact Books
+
+List available contact books:
+
+```ruby
+# List contact books
+books = client.contact_books.list(limit: 50)
+
+# Iterate through all contact books
+client.contact_books.each_item do |book|
+  puts "Book: #{book.name} (#{book.id})"
+end
+```
+
+### Contact Groups
+
+Manage groups and organizations within contact books:
+
+```ruby
+# List groups in a contact book
+groups = client.contact_groups.list(
+  contact_book: "book-id-here",
+  kind: "group"  # or "organization"
+)
+
+# Iterate through all groups
+client.contact_groups.each_item(
+  contact_book: "book-id-here",
+  kind: "group"
+) do |group|
+  puts "Group: #{group.name}"
+end
 ```
 
 ### Pagination

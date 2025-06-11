@@ -2,6 +2,7 @@
 
 require "spec_helper"
 require "webmock/rspec"
+require_relative "../support/shared_examples/paginator_examples"
 
 RSpec.describe Missive::Paginator do
   let(:client) { instance_double("Missive::Client") }
@@ -21,7 +22,7 @@ RSpec.describe Missive::Paginator do
         url = if index == 0
                 path
               else
-                "#{path}?until=#{pages[index - 1]["next"]["until"]}"
+                "#{path}?until=#{pages[index - 1][:next][:until]}"
               end
 
         allow(connection).to receive(:request).with(:get, url).and_return(page_data)
@@ -105,7 +106,7 @@ RSpec.describe Missive::Paginator do
           items << item
         end
 
-        expected_items = pages.flat_map { |page| page["data"] || [] }
+        expected_items = pages.flat_map { |page| page[:data] || [] }
         expect(items).to eq(expected_items)
       end
 
@@ -123,9 +124,9 @@ RSpec.describe Missive::Paginator do
   context "with single page transcript" do
     include_examples "a paginator", [
       {
-        "data" => [
-          { "id" => 1, "name" => "Item 1" },
-          { "id" => 2, "name" => "Item 2" }
+        data: [
+          { id: 1, name: "Item 1" },
+          { id: 2, name: "Item 2" }
         ]
       }
     ]
@@ -134,24 +135,60 @@ RSpec.describe Missive::Paginator do
   context "with multi-page transcript" do
     include_examples "a paginator", [
       {
-        "data" => [
-          { "id" => 1, "name" => "Item 1" },
-          { "id" => 2, "name" => "Item 2" }
+        data: [
+          { id: 1, name: "Item 1" },
+          { id: 2, name: "Item 2" }
         ],
-        "next" => { "until" => "token1" }
+        next: { until: "token1" }
       },
       {
-        "data" => [
-          { "id" => 3, "name" => "Item 3" },
-          { "id" => 4, "name" => "Item 4" }
+        data: [
+          { id: 3, name: "Item 3" },
+          { id: 4, name: "Item 4" }
         ],
-        "next" => { "until" => "token2" }
+        next: { until: "token2" }
       },
       {
-        "data" => [
-          { "id" => 5, "name" => "Item 5" }
+        data: [
+          { id: 5, name: "Item 5" }
         ]
       }
     ]
+  end
+
+  context "with offset-based pagination" do
+    let(:client) { instance_double("Missive::Client") }
+    let(:connection) { instance_double("Missive::Connection") }
+
+    before do
+      allow(client).to receive(:connection).and_return(connection)
+    end
+
+    it_behaves_like "an offset paginator"
+
+    context "with max_offset limit" do
+      it "stops pagination when max_offset is reached" do
+        page1 = { data: Array.new(200) { |i| { id: i } }, offset: 0, limit: 200 }
+        page2 = { data: Array.new(200) { |i| { id: i + 200 } }, offset: 200, limit: 200 }
+        page3 = { data: Array.new(100) { |i| { id: i + 300 } }, offset: 300, limit: 200 }
+
+        allow(connection).to receive(:request).with(:get, "/contacts?limit=200").and_return(page1)
+        allow(connection).to receive(:request).with(:get, "/contacts?limit=200&offset=200").and_return(page2)
+        allow(connection).to receive(:request).with(:get, "/contacts?limit=200&offset=300").and_return(page3)
+
+        items = []
+        described_class.each_item(
+          path: "/contacts",
+          params: { limit: 200 },
+          client: client,
+          max_offset: 300
+        ) do |item|
+          items << item
+        end
+
+        expect(items.length).to eq(500)
+        expect(connection).to have_received(:request).exactly(3).times
+      end
+    end
   end
 end

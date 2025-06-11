@@ -5,6 +5,9 @@ require "missive/client"
 require "missive/paginator"
 require "missive/object"
 require "missive/signature"
+require "missive/resources/contacts"
+require "missive/resources/contact_books"
+require "missive/resources/contact_groups"
 
 module Missive
   class << self

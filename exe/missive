@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "thor"
+require "yaml"
+require "json"
+require_relative "../lib/missive"
+require_relative "../lib/missive/cli"
+
+# Run the CLI if this file is executed directly
+Missive::CLI.start(ARGV) if __FILE__ == $PROGRAM_NAME

@@ -426,6 +426,70 @@ RSpec.describe Missive do
       end
     end
 
+    describe "#tasks" do
+      it "memoizes the tasks resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        tasks1 = client.tasks
+        tasks2 = client.tasks
+        expect(tasks1).to be(tasks2)
+      end
+
+      it "creates Tasks resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        tasks = client.tasks
+        expect(tasks).to be_a(Missive::Resources::Tasks)
+        expect(tasks.client).to eq(client)
+      end
+    end
+
+    describe "#teams" do
+      it "memoizes the teams resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        teams1 = client.teams
+        teams2 = client.teams
+        expect(teams1).to be(teams2)
+      end
+
+      it "creates Teams resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        teams = client.teams
+        expect(teams).to be_a(Missive::Resources::Teams)
+        expect(teams.client).to eq(client)
+      end
+    end
+
+    describe "#users" do
+      it "memoizes the users resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        users1 = client.users
+        users2 = client.users
+        expect(users1).to be(users2)
+      end
+
+      it "creates Users resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        users = client.users
+        expect(users).to be_a(Missive::Resources::Users)
+        expect(users.client).to eq(client)
+      end
+    end
+
+    describe "#hooks" do
+      it "memoizes the hooks resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        hooks1 = client.hooks
+        hooks2 = client.hooks
+        expect(hooks1).to be(hooks2)
+      end
+
+      it "creates Hooks resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        hooks = client.hooks
+        expect(hooks).to be_a(Missive::Resources::Hooks)
+        expect(hooks.client).to eq(client)
+      end
+    end
+
     describe "multiple clients" do
       it "creates clients with different tokens and separate connection objects" do
         client1 = Missive::Client.new(api_token: "token1")

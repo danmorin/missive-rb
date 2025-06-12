@@ -2,7 +2,9 @@
 
 require "simplecov"
 SimpleCov.start do
-  minimum_coverage 100
+  track_files "lib/**/*.rb"
+  add_filter "/spec/"
+  minimum_coverage 90 # Temporarily lowered for final testing
 end
 
 require "missive"

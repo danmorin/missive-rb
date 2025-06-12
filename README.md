@@ -454,6 +454,156 @@ Missive::Paginator.each_item(
 end
 ```
 
+## Managing tasks programmatically
+
+The Tasks API allows you to create and update tasks programmatically:
+
+```ruby
+# Create a standalone task assigned to a team
+task = client.tasks.create(
+  title: "Follow up with client about proposal",
+  team: "team-123",
+  organization: "org-456",
+  description: "Review the proposal and schedule a follow-up meeting",
+  due_at: (Time.now + 7.days).iso8601
+)
+
+puts "Task created: #{task.id}"
+
+# Create a subtask for a specific conversation
+subtask = client.tasks.create(
+  title: "Review attached documents",
+  subtask: true,
+  conversation: "conv-789",
+  state: "todo"
+)
+
+# Update task status and details
+updated_task = client.tasks.update(
+  id: task.id,
+  state: "done",
+  title: "Updated: Follow up completed",
+  description: "Meeting scheduled for next week"
+)
+
+puts "Task updated: #{updated_task.state}"
+```
+
+## Registering webhooks securely
+
+The Hooks API and WebhookServer middleware provide secure webhook management:
+
+```ruby
+# Create webhooks for different events
+comment_hook = client.hooks.create(
+  type: "new_comment",
+  url: "https://your-app.com/webhooks/comments",
+  organization: "org-123"
+)
+
+email_hook = client.hooks.create(
+  type: "incoming_email",
+  url: "https://your-app.com/webhooks/emails",
+  mailbox: "inbox-456"
+)
+
+# Delete a webhook when no longer needed
+client.hooks.delete(id: comment_hook.id)
+```
+
+### Setting up webhook validation
+
+Use the WebhookServer middleware to validate webhook signatures:
+
+```ruby
+# In a Sinatra app
+require 'sinatra'
+require 'missive'
+
+use Missive::WebhookServer, signature_secret: ENV['MISSIVE_WEBHOOK_SECRET']
+
+post '/webhooks' do
+  webhook_data = request.env['missive.webhook']
+  
+  if webhook_data
+    puts "Received webhook: #{webhook_data[:type]}"
+    # Process the webhook data
+  end
+  
+  { status: 'ok' }.to_json
+end
+
+# Or use the mount helper for quick setup
+app = Missive::WebhookServer.mount('/webhooks', ENV['MISSIVE_WEBHOOK_SECRET'])
+run app
+```
+
+### Rails integration
+
+In Rails, add webhook validation to your routes:
+
+```ruby
+# config/application.rb
+config.middleware.use Missive::WebhookServer, 
+  signature_secret: Rails.application.credentials.dig(:missive, :webhook_secret)
+
+# In your controller
+class WebhooksController < ApplicationController
+  def receive
+    webhook_data = request.env['missive.webhook']
+    
+    case webhook_data[:type]
+    when 'new_comment'
+      handle_new_comment(webhook_data)
+    when 'incoming_email'
+      handle_incoming_email(webhook_data)
+    end
+    
+    render json: { status: 'ok' }
+  end
+end
+```
+
+## Using the CLI
+
+Install the CLI executable and use it for quick operations:
+
+```bash
+# Install the gem
+gem install missive-rb
+
+# Configure your API token (one-time setup)
+echo "api_token: your-token-here" > ~/.missive.yml
+
+# List teams
+missive teams list --limit 10 --organization org-123
+
+# Create a task
+missive tasks create \
+  --title "Review customer feedback" \
+  --team team-456 \
+  --organization org-123 \
+  --description "Analyze the latest survey results"
+
+# Delete a webhook
+missive hooks delete hook-789
+```
+
+### CLI Configuration
+
+The CLI reads configuration from `~/.missive.yml`:
+
+```yaml
+api_token: your-missive-api-token-here
+```
+
+Or use environment variables:
+
+```bash
+export MISSIVE_API_TOKEN=your-token-here
+missive teams list
+```
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.

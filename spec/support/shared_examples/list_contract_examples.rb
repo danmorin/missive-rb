@@ -24,14 +24,14 @@ RSpec.shared_examples "a resource with consistent list method" do |resource_clas
 
     it "returns an Array" do
       allow(connection).to receive(:request).and_return(mock_response)
-      
+
       result = resource.list(limit: 2)
       expect(result).to be_an(Array), "#{resource_class} list() should return Array"
     end
 
     it "returns Missive::Object instances" do
       allow(connection).to receive(:request).and_return(mock_response)
-      
+
       result = resource.list(limit: 2)
       expect(result.length).to eq(2)
       expect(result.first).to be_a(Missive::Object), "#{resource_class} should return Missive::Object instances"
@@ -42,7 +42,7 @@ RSpec.shared_examples "a resource with consistent list method" do |resource_clas
     it "handles empty response gracefully" do
       empty_response = { data_key => [], "offset" => 0, "limit" => 50 }
       allow(connection).to receive(:request).and_return(empty_response)
-      
+
       result = resource.list(limit: 2)
       expect(result).to be_an(Array)
       expect(result).to be_empty
@@ -51,7 +51,7 @@ RSpec.shared_examples "a resource with consistent list method" do |resource_clas
     it "handles missing data key gracefully" do
       response_without_data = { "offset" => 0, "limit" => 50 }
       allow(connection).to receive(:request).and_return(response_without_data)
-      
+
       result = resource.list(limit: 2)
       expect(result).to be_an(Array)
       expect(result).to be_empty

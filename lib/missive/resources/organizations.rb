@@ -24,7 +24,7 @@ module Missive
 
         ActiveSupport::Notifications.instrument("missive.organizations.list", params: params) do
           response = @client.connection.request(:get, LIST, params: params)
-          
+
           # Return array of Missive::Object instances
           (response[:organizations] || []).map { |org| Missive::Object.new(org, @client) }
         end

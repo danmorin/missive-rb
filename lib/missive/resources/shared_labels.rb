@@ -68,7 +68,7 @@ module Missive
 
         ActiveSupport::Notifications.instrument("missive.shared_labels.list", params: params) do
           response = @client.connection.request(:get, LIST, params: params)
-          
+
           # Return array of Missive::Object instances
           (response[:shared_labels] || []).map { |label| Missive::Object.new(label, @client) }
         end

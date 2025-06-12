@@ -3,23 +3,23 @@
 require "spec_helper"
 
 RSpec.describe "List Method Consistency", :vcr do
-  let(:client) { Missive::Client.new(api_token: ENV['MISSIVE_API_TOKEN'] || 'test-token') }
+  let(:client) { Missive::Client.new(api_token: ENV["MISSIVE_API_TOKEN"] || "test-token") }
 
   # Skip integration tests if no API token is provided
   before do
-    skip "Set MISSIVE_API_TOKEN environment variable to run integration tests" unless ENV['MISSIVE_API_TOKEN']
+    skip "Set MISSIVE_API_TOKEN environment variable to run integration tests" unless ENV["MISSIVE_API_TOKEN"]
   end
 
   shared_examples "consistent list endpoint" do |resource_name, resource_method|
     it "returns an array of Missive::Object instances" do
       VCR.use_cassette("#{resource_name}_list_consistency") do
         result = client.public_send(resource_method).list(limit: 1)
-        
+
         expect(result).to be_an(Array), "#{resource_name} should return an Array, got #{result.class}"
-        
+
         if result.any?
-          expect(result.first).to be_a(Missive::Object), 
-            "#{resource_name} array elements should be Missive::Object instances, got #{result.first.class}"
+          expect(result.first).to be_a(Missive::Object),
+                                  "#{resource_name} array elements should be Missive::Object instances, got #{result.first.class}"
           expect(result.first).to respond_to(:id), "#{resource_name} objects should have an id method"
         end
       end
@@ -33,17 +33,16 @@ RSpec.describe "List Method Consistency", :vcr do
 
   describe "Teams" do
     include_examples "consistent list endpoint", "teams", :teams
-    
+
     it "accepts organization parameter" do
       VCR.use_cassette("teams_list_with_organization") do
         # This might fail if no organization is available, but that's expected
-        begin
-          result = client.teams.list(limit: 1, organization: "test-org-id")
-          expect(result).to be_an(Array)
-        rescue Missive::NotFoundError, Missive::AuthenticationError
-          # These errors are expected in tests - the important thing is the return type
-          skip "Organization not accessible, but endpoint structure verified"
-        end
+
+        result = client.teams.list(limit: 1, organization: "test-org-id")
+        expect(result).to be_an(Array)
+      rescue Missive::NotFoundError, Missive::AuthenticationError
+        # These errors are expected in tests - the important thing is the return type
+        skip "Organization not accessible, but endpoint structure verified"
       end
     end
   end
@@ -75,3 +74,4 @@ RSpec.describe "List Method Consistency", :vcr do
   describe "Responses" do
     include_examples "consistent list endpoint", "responses", :responses
   end
+end

@@ -16,7 +16,7 @@ RSpec.describe "List Methods Contract" do
     ]
 
     standard_resources.each do |resource_class, data_key|
-      context "#{resource_class}" do
+      context resource_class.to_s do
         include_examples "a resource with consistent list method", resource_class, data_key
       end
     end
@@ -43,7 +43,7 @@ RSpec.describe "List Methods Contract" do
           ]
         }
         allow(connection).to receive(:request).and_return(mock_response)
-        
+
         result = resource.list(contact_book: "book-123", kind: "group", limit: 1)
         expect(result).to be_an(Array)
         expect(result.first).to be_a(Missive::Object) if result.any?
@@ -67,7 +67,7 @@ RSpec.describe "List Methods Contract" do
           ]
         }
         allow(connection).to receive(:request).and_return(mock_response)
-        
+
         result = resource.list(limit: 1)
         expect(result).to be_an(Array)
         expect(result.first).to be_a(Missive::Object) if result.any?

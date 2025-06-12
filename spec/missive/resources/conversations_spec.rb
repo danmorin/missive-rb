@@ -159,7 +159,11 @@ RSpec.describe Missive::Resources::Conversations do
 
   describe "#get" do
     let(:conversation_response) do
-      { id: "conv-123", subject: "Test Subject" }
+      {
+        "conversations" => [
+          { id: "conv-123", subject: "Test Subject" }
+        ]
+      }
     end
 
     before do

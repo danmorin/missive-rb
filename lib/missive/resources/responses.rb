@@ -27,7 +27,7 @@ module Missive
 
         ActiveSupport::Notifications.instrument("missive.responses.list", params: params) do
           response = @client.connection.request(:get, LIST, params: params)
-          
+
           # Return array of Missive::Object instances
           (response[:responses] || []).map { |resp| Missive::Object.new(resp, @client) }
         end
@@ -62,7 +62,13 @@ module Missive
 
         ActiveSupport::Notifications.instrument("missive.responses.get", id: id) do
           response = @client.connection.request(:get, path)
-          Missive::Object.new(response, @client)
+
+          # API returns {responses: [single_response]} structure even for GET by ID
+          # Extract the first response from the array
+          responses = response[:responses] || response["responses"] || []
+          raise Missive::NotFoundError, "Response not found" if responses.empty?
+
+          Missive::Object.new(responses.first, @client)
         end
       end
 

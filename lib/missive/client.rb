@@ -43,6 +43,34 @@ module Missive
   #   @example
   #     client.responses.list(organization: "org-123")
   #     client.responses.get(id: "resp-123")
+  #
+  # @!method tasks
+  #   Access the Tasks resource
+  #   @return [Missive::Resources::Tasks] Tasks resource instance
+  #   @example
+  #     client.tasks.create(title: "Follow up", team: "team-123")
+  #     client.tasks.update(id: "task-123", state: "done")
+  #
+  # @!method teams
+  #   Access the Teams resource
+  #   @return [Missive::Resources::Teams] Teams resource instance
+  #   @example
+  #     client.teams.list(limit: 50)
+  #     client.teams.each_item { |team| puts team.name }
+  #
+  # @!method users
+  #   Access the Users resource
+  #   @return [Missive::Resources::Users] Users resource instance
+  #   @example
+  #     client.users.list(limit: 50)
+  #     client.users.each_item { |user| puts user.email }
+  #
+  # @!method hooks
+  #   Access the Hooks resource
+  #   @return [Missive::Resources::Hooks] Hooks resource instance
+  #   @example
+  #     client.hooks.create(type: "new_comment", url: "https://example.com/webhook")
+  #     client.hooks.delete(id: "hook-123")
   class Client
     attr_reader :config, :token
 
@@ -104,6 +132,22 @@ module Missive
 
     def responses
       @responses ||= Missive::Resources::Responses.new(self)
+    end
+
+    def tasks
+      @tasks ||= Missive::Resources::Tasks.new(self)
+    end
+
+    def teams
+      @teams ||= Missive::Resources::Teams.new(self)
+    end
+
+    def users
+      @users ||= Missive::Resources::Users.new(self)
+    end
+
+    def hooks
+      @hooks ||= Missive::Resources::Hooks.new(self)
     end
   end
 end

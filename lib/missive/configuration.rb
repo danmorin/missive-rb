@@ -5,7 +5,8 @@ require "active_support/notifications"
 
 module Missive
   class Configuration
-    attr_accessor :logger, :instrumenter, :token_lookup, :base_url, :soft_limit_threshold
+    attr_accessor :logger, :instrumenter, :token_lookup, :base_url, :soft_limit_threshold,
+                  :api_token, :signature_secrets
 
     def initialize
       @logger = Logger.new($stdout).tap { |l| l.level = Logger::INFO }
@@ -13,6 +14,8 @@ module Missive
       @token_lookup = ->(_email) {}
       @base_url = Missive::Constants::BASE_URL
       @soft_limit_threshold = 30
+      @api_token = nil
+      @signature_secrets = {}
     end
 
     def freeze

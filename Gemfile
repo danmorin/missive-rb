@@ -9,6 +9,7 @@ gem "irb"
 gem "rake", "~> 13.0"
 
 gem "concurrent-ruby", "~> 1.2"
+gem "rack-test", "~> 2.0"
 gem "rspec", "~> 3.0"
 gem "simplecov", "~> 0.22"
 gem "timecop", "~> 0.9"

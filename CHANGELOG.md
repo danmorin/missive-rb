@@ -11,6 +11,13 @@
 - SharedLabels resource with create, update, and list operations
 - Organizations resource with list and pagination support
 - Responses resource with list and get operations
+- Tasks resource with create and update operations
+- Teams resource with list and pagination support
+- Users resource with list and pagination support
+- Hooks resource with create and delete operations for webhook management
+- WebhookServer Rack middleware with HMAC-SHA256 signature validation
+- Rails Railtie integration with automatic configuration and logging
+- CLI executable with Thor-based commands for teams, tasks, and hooks management
 - Offset-based pagination support in Paginator (in addition to existing until-based)
 - Enhanced pagination for endpoints that may return more than requested limit
 - Hash-style access (`[]`) method to Missive::Object for convenience

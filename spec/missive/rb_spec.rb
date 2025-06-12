@@ -133,7 +133,8 @@ RSpec.describe Missive do
           Missive::MissingTokenError,
           Missive::AuthenticationError,
           Missive::RateLimitError,
-          Missive::ServerError
+          Missive::ServerError,
+          Missive::NotSupportedError
         ]
       end
 
@@ -705,6 +706,8 @@ RSpec.describe Missive do
         expect(config.token_lookup.call("test")).to be_nil
         expect(config.base_url).to eq(Missive::Constants::BASE_URL)
         expect(config.soft_limit_threshold).to eq(30)
+        expect(config.cache_store).to be_nil
+        expect(config.cache_enabled).to be_falsey
       end
 
       it "initializes logger with correct output stream and level" do
@@ -734,6 +737,8 @@ RSpec.describe Missive do
         expect(config.token_lookup).to be_frozen
         expect(config.base_url).to be_frozen
         expect(config.soft_limit_threshold).to be_frozen
+        expect(config.cache_store).to be_frozen
+        expect(config.cache_enabled).to be_frozen
       end
     end
 
@@ -747,6 +752,29 @@ RSpec.describe Missive do
 
         expect(config2).not_to be(config1)
         expect(config2.logger).not_to eq(config1.logger)
+      end
+    end
+
+    describe "cache configuration" do
+      it "allows setting cache_enabled to true" do
+        config = Missive::Configuration.new
+        config.cache_enabled = true
+
+        expect(config.cache_enabled).to be_truthy
+      end
+
+      it "allows setting cache_store to a custom store" do
+        cache_store = double("cache_store")
+        config = Missive::Configuration.new
+        config.cache_store = cache_store
+
+        expect(config.cache_store).to eq(cache_store)
+      end
+
+      it "allows setting cache_store to nil" do
+        config = Missive::Configuration.new
+        config.cache_store = nil
+        expect(config.cache_store).to be_nil
       end
     end
   end

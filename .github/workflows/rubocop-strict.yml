@@ -1,0 +1,54 @@
+name: RuboCop Strict (Nightly)
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Run at 2 AM UTC daily
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  rubocop_strict:
+    runs-on: ubuntu-latest
+    name: RuboCop Strict Analysis
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+      
+      - name: Run RuboCop with strict refactor-level enforcement
+        run: bundle exec rubocop --fail-level refactor --format json --out rubocop-results.json
+        continue-on-error: true
+        
+      - name: Generate RuboCop report
+        if: always()
+        run: |
+          # Generate human-readable report
+          bundle exec rubocop --fail-level refactor --format html --out rubocop-report.html
+          bundle exec rubocop --fail-level refactor --format simple > rubocop-summary.txt
+          
+      - name: Upload RuboCop results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: rubocop-strict-results
+          path: |
+            rubocop-results.json
+            rubocop-report.html
+            rubocop-summary.txt
+          retention-days: 7
+          
+      - name: Check for style violations
+        run: |
+          VIOLATIONS=$(jq '.summary.offense_count' rubocop-results.json)
+          echo "STYLE_VIOLATIONS=${VIOLATIONS}" >> $GITHUB_ENV
+          
+          if [ "${VIOLATIONS}" -gt 0 ]; then
+            echo "⚠️ Found ${VIOLATIONS} style violations at refactor level"
+            exit 1
+          else
+            echo "✅ No style violations found"
+          fi

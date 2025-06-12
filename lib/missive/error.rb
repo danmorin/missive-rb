@@ -35,4 +35,7 @@ module Missive
 
   class ServerError < Error
   end
+
+  class NotSupportedError < Error
+  end
 end

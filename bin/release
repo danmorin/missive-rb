@@ -1,0 +1,187 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative '../lib/missive/version'
+
+class ReleaseScript
+  def initialize(dry_run: false)
+    @dry_run = dry_run
+    @version = Missive::VERSION
+  end
+
+  def run
+    puts "🚀 Starting release process for v#{@version}"
+    puts "🔍 Dry run mode" if @dry_run
+
+    # Run pre-release checks
+    run_smoke_test
+    ensure_clean_git_status
+    ensure_on_main_branch
+    
+    # Create and push tag
+    create_git_tag
+    push_git_tag
+    
+    # Build and push gem
+    build_gem
+    push_gem
+    
+    # Create GitHub release
+    create_github_release
+    
+    puts "✅ Release v#{@version} completed successfully!"
+  rescue StandardError => e
+    puts "❌ Release failed: #{e.message}"
+    exit 1
+  end
+
+  private
+
+  def run_smoke_test
+    puts "🧪 Running smoke test with bin/console..."
+    
+    console_test = <<~RUBY
+      require 'bundler/setup'
+      require 'missive'
+      puts "Missive::VERSION = #{Missive::VERSION}"
+      puts "Smoke test passed!"
+    RUBY
+    
+    if @dry_run
+      puts "  [DRY RUN] Would run: echo '#{console_test}' | bundle exec ruby"
+    else
+      result = system("echo '#{console_test}' | bundle exec ruby")
+      raise "Smoke test failed" unless result
+    end
+    
+    puts "  ✅ Smoke test passed"
+  end
+
+  def ensure_clean_git_status
+    puts "🔍 Checking git status..."
+    
+    status_output = `git status --porcelain`.strip
+    
+    unless status_output.empty?
+      puts "  Uncommitted changes:"
+      puts status_output
+      raise "Git working directory is not clean. Please commit or stash changes."
+    end
+    
+    puts "  ✅ Git working directory is clean"
+  end
+
+  def ensure_on_main_branch
+    puts "🌿 Checking current branch..."
+    
+    current_branch = `git rev-parse --abbrev-ref HEAD`.strip
+    
+    unless current_branch == 'main'
+      raise "Not on main branch (currently on: #{current_branch}). Please switch to main."
+    end
+    
+    puts "  ✅ On main branch"
+  end
+
+  def create_git_tag
+    puts "🏷️  Creating git tag v#{@version}..."
+    
+    tag_name = "v#{@version}"
+    
+    if @dry_run
+      puts "  [DRY RUN] Would run: git tag -a #{tag_name} -m 'Release #{tag_name}'"
+    else
+      result = system("git tag -a #{tag_name} -m 'Release #{tag_name}'")
+      raise "Failed to create git tag" unless result
+    end
+    
+    puts "  ✅ Git tag #{tag_name} created"
+  end
+
+  def push_git_tag
+    puts "📤 Pushing git tag..."
+    
+    if @dry_run
+      puts "  [DRY RUN] Would run: git push origin v#{@version}"
+    else
+      result = system("git push origin v#{@version}")
+      raise "Failed to push git tag" unless result
+    end
+    
+    puts "  ✅ Git tag pushed to origin"
+  end
+
+  def build_gem
+    puts "💎 Building gem..."
+    
+    if @dry_run
+      puts "  [DRY RUN] Would run: gem build missive.gemspec"
+    else
+      result = system("gem build missive.gemspec")
+      raise "Failed to build gem" unless result
+    end
+    
+    puts "  ✅ Gem built: missive-#{@version}.gem"
+  end
+
+  def push_gem
+    puts "📦 Pushing gem to RubyGems..."
+    
+    gem_file = "missive-#{@version}.gem"
+    
+    if @dry_run
+      puts "  [DRY RUN] Would run: gem push #{gem_file}"
+    else
+      result = system("gem push #{gem_file}")
+      raise "Failed to push gem to RubyGems" unless result
+    end
+    
+    puts "  ✅ Gem pushed to RubyGems"
+  end
+
+  def create_github_release
+    puts "🐙 Creating GitHub release..."
+    
+    # Extract changelog content for this version
+    changelog_content = extract_changelog_content
+    
+    if @dry_run
+      puts "  [DRY RUN] Would run: gh release create v#{@version} --title 'Release v#{@version}' --notes '#{changelog_content.gsub("'", "\\'")}'"
+    else
+      # Create temporary file for changelog content
+      changelog_file = "/tmp/changelog_#{@version}.md"
+      File.write(changelog_file, changelog_content)
+      
+      result = system("gh release create v#{@version} --title 'Release v#{@version}' --notes-file '#{changelog_file}'")
+      
+      # Cleanup
+      File.delete(changelog_file) if File.exist?(changelog_file)
+      
+      raise "Failed to create GitHub release" unless result
+    end
+    
+    puts "  ✅ GitHub release created"
+  end
+
+  def extract_changelog_content
+    changelog_path = File.join(__dir__, '..', 'CHANGELOG.md')
+    return "Release v#{@version}" unless File.exist?(changelog_path)
+    
+    content = File.read(changelog_path)
+    
+    # Extract content between this version and the next section
+    version_section = content.match(/## \[#{Regexp.escape(@version)}\].*?\n(.*?)(?=\n## |\n\z)/m)
+    
+    if version_section
+      version_section[1].strip
+    else
+      "Release v#{@version}"
+    end
+  end
+end
+
+# Parse command line arguments
+dry_run = ARGV.include?('--dry-run')
+
+# Run the release script
+ReleaseScript.new(dry_run: dry_run).run

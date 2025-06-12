@@ -1,36 +1,48 @@
 # Missive Ruby Client
 
+[![Gem Version](https://badge.fury.io/rb/missive-rb.svg)](https://badge.fury.io/rb/missive-rb)
+[![CI](https://github.com/danmorin/missive-rb/workflows/CI/badge.svg)](https://github.com/danmorin/missive-rb/actions)
+[![Coverage](https://codecov.io/gh/danmorin/missive-rb/branch/main/graph/badge.svg)](https://codecov.io/gh/danmorin/missive-rb)
+
 A Ruby client library for the Missive API, providing thread-safe connection management, rate limiting, and comprehensive error handling.
 
-## Resources Implemented
+## Why missive-rb?
 
-- **Analytics** - Create and retrieve analytics reports
-- **Contacts** - Create, update, list, and retrieve contacts  
-- **Contact Books** - List available contact books
-- **Contact Groups** - List groups and organizations within contact books
-- **Conversations** - List, retrieve conversations and access their messages and comments
-- **Messages** - Create messages (for custom channels), retrieve messages, and search by email message ID
-- **Drafts** - Create and send drafts
-- **Posts** - Create and delete posts
-- **SharedLabels** - Create, update, and list shared labels
-- **Organizations** - List organizations
-- **Responses** - List and retrieve response templates
+**missive-rb** stands out as the most comprehensive and production-ready Ruby client for the Missive API:
 
-## Installation
+- **🚀 Complete API Coverage** - Full support for all 15 Missive API resources
+- **⚡ Performance Optimized** - Built-in rate limiting, connection pooling, and optional caching
+- **🔒 Enterprise Ready** - Thread-safe design, comprehensive error handling, and webhook validation
+- **🛠️ Developer Friendly** - Rich CLI tools, extensive documentation, and Rails integration
+- **📊 Monitoring Built-in** - ActiveSupport::Notifications integration for observability
 
-Add this line to your application's Gemfile:
-
-```ruby
-gem 'missive-rb'
-```
-
-And then execute:
+## Quick Start
 
 ```bash
-bundle install
+gem install missive-rb
 ```
 
-Or install it yourself as:
+## Resource Coverage
+
+| Resource | Create | Read | Update | Delete | List | Paginate |
+|----------|--------|------|--------|--------|------|----------|
+| **Analytics** | ✅ | ✅ | ➖ | ➖ | ➖ | ➖ |
+| **Contacts** | ✅ | ✅ | ✅ | ➖ | ✅ | ✅ |
+| **Contact Books** | ➖ | ➖ | ➖ | ➖ | ✅ | ✅ |
+| **Contact Groups** | ➖ | ➖ | ➖ | ➖ | ✅ | ✅ |
+| **Conversations** | ➖ | ✅ | ➖ | ➖ | ✅ | ✅ |
+| **Messages** | ✅ | ✅ | ➖ | ➖ | ✅ | ✅ |
+| **Drafts** | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ |
+| **Posts** | ✅ | ➖ | ➖ | ✅ | ➖ | ➖ |
+| **SharedLabels** | ✅ | ➖ | ✅ | ➖ | ✅ | ✅ |
+| **Organizations** | ➖ | ➖ | ➖ | ➖ | ✅ | ✅ |
+| **Responses** | ➖ | ✅ | ➖ | ➖ | ✅ | ✅ |
+| **Tasks** | ✅ | ➖ | ✅ | ➖ | ➖ | ➖ |
+| **Teams** | ➖ | ➖ | ➖ | ➖ | ✅ | ✅ |
+| **Users** | ➖ | ➖ | ➖ | ➖ | ✅ | ✅ |
+| **Hooks** | ✅ | ➖ | ➖ | ✅ | ➖ | ➖ |
+
+## Installation
 
 ```bash
 gem install missive-rb
@@ -578,6 +590,9 @@ echo "api_token: your-token-here" > ~/.missive.yml
 # List teams
 missive teams list --limit 10 --organization org-123
 
+# List users
+missive users list --limit 20 --organization org-123
+
 # Create a task
 missive tasks create \
   --title "Review customer feedback" \
@@ -585,8 +600,35 @@ missive tasks create \
   --organization org-123 \
   --description "Analyze the latest survey results"
 
+# Update a task
+missive tasks update \
+  --id task-123 \
+  --state done \
+  --title "Updated task title"
+
+# Create a webhook
+missive hooks create \
+  --type new_comment \
+  --url https://your-app.com/webhooks/comments \
+  --organization org-123
+
 # Delete a webhook
 missive hooks delete hook-789
+
+# Sync contacts to stdout as JSON
+missive contacts sync --since 2024-01-01 --limit 100
+
+# Export conversation data
+missive conversations export \
+  --id conv-123 \
+  --file conversation_backup.json
+
+# Generate analytics report and wait for completion
+missive analytics report \
+  --type email_volume \
+  --organization org-123 \
+  --wait \
+  --timeout 300
 ```
 
 ### CLI Configuration
@@ -597,12 +639,75 @@ The CLI reads configuration from `~/.missive.yml`:
 api_token: your-missive-api-token-here
 ```
 
-Or use environment variables:
+Or use environment variables or command line flags:
 
 ```bash
+# Environment variable
 export MISSIVE_API_TOKEN=your-token-here
 missive teams list
+
+# Command line flag (highest priority)
+missive teams list --token your-token-here
 ```
+
+## HTTP Caching (Advanced)
+
+Improve performance by enabling HTTP caching for GET requests. The library uses the industry-standard `faraday-http-cache` middleware to handle ETags and Last-Modified headers automatically.
+
+### Enabling Caching
+
+```ruby
+require 'missive'
+
+# Enable caching with default in-memory store
+Missive.configure do |config|
+  config.cache_enabled = true
+end
+
+client = Missive::Client.new(api_token: 'your_token_here')
+```
+
+### Using a Custom Cache Store
+
+For production environments, use a shared cache store:
+
+```ruby
+require 'missive'
+require 'active_support/cache'
+
+# Use ActiveSupport's memory store
+Missive.configure do |config|
+  config.cache_enabled = true
+  config.cache_store = ActiveSupport::Cache::MemoryStore.new
+end
+
+# Or use Redis for multi-process caching
+# config.cache_store = ActiveSupport::Cache::RedisCacheStore.new(url: "redis://localhost:6379/1")
+
+client = Missive::Client.new(api_token: 'your_token_here')
+```
+
+### Rails Integration
+
+In a Rails application:
+
+```ruby
+# config/initializers/missive.rb
+Missive.configure do |config|
+  config.cache_enabled = true
+  config.cache_store = Rails.cache  # Use Rails' configured cache store
+end
+```
+
+### How Caching Works
+
+- Only GET requests are cached
+- Uses HTTP caching headers (ETag, Last-Modified) for validation
+- Returns cached responses for repeated requests when data hasn't changed
+- Automatically handles cache invalidation based on HTTP response headers
+- Cache misses still make API calls but store the response for future use
+
+**Note:** Caching is disabled by default to maintain backward compatibility. Enable it explicitly when you're ready to take advantage of the performance benefits.
 
 ## Development
 

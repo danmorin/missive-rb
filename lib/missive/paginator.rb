@@ -60,10 +60,32 @@ module Missive
 
           current_params = current_params.merge(offset: next_offset)
         else
-          # Original until-based pagination
+          # Enhanced until-based pagination for conversations, messages, and comments
+          # that may return more than the requested limit
           break unless parsed_response.dig(:next, :until)
 
-          current_params = current_params.merge(until: parsed_response.dig(:next, :until))
+          next_until = parsed_response.dig(:next, :until)
+
+          # Find data array in common locations for conversations/messages/comments
+          data_array = parsed_response[:data] ||
+                       parsed_response[:conversations] ||
+                       parsed_response[:messages] ||
+                       parsed_response[:comments] ||
+                       []
+
+          limit = current_params[:limit] || 25
+
+          # Enhanced pagination logic for endpoints that may exceed limit:
+          # Only apply enhanced logic if we actually have data that could exceed limit
+          # Check if all items have the same timestamp as the 'until' token
+          # This indicates we've reached the boundary of items with identical timestamps
+          if (data_array.size >= limit) && data_array.all? do |item|
+            [item[:created_at], item[:updated_at]].include?(next_until)
+          end
+            break
+          end
+
+          current_params = current_params.merge(until: next_until)
         end
 
         page_number += 1

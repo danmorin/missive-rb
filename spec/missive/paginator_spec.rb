@@ -191,4 +191,72 @@ RSpec.describe Missive::Paginator do
       end
     end
   end
+
+  context "with enhanced until-based pagination for conversations/messages/comments" do
+    let(:client) { instance_double("Missive::Client") }
+    let(:connection) { instance_double("Missive::Connection") }
+
+    before do
+      allow(client).to receive(:connection).and_return(connection)
+    end
+
+    it "handles result sets exceeding limit and detects done condition" do
+      # First page: limit=50, returns 75 items (exceeds limit), with different timestamps
+      page1 = {
+        conversations: Array.new(75) { |i| { id: i, created_at: "2024-01-01T10:#{i % 60}:00Z" } },
+        next: { until: "2024-01-01T09:00:00Z" }
+      }
+
+      # Second page: limit=50, returns 25 items (less than limit - done condition)
+      page2 = {
+        conversations: Array.new(25) { |i| { id: i + 75, created_at: "2024-01-01T09:00:00Z" } }
+      }
+
+      allow(connection).to receive(:request).with(:get, "/conversations?limit=50").and_return(page1)
+      allow(connection).to receive(:request).with(:get, "/conversations?limit=50&until=2024-01-01T09:00:00Z").and_return(page2)
+
+      pages = []
+      described_class.each_page(
+        path: "/conversations",
+        params: { limit: 50 },
+        client: client
+      ) do |page|
+        pages << page
+      end
+
+      expect(pages.size).to eq(2)
+      expect(pages[0][:conversations].size).to eq(75)  # First page exceeds limit
+      expect(pages[1][:conversations].size).to eq(25)  # Second page less than limit
+
+      # Verify correct requests were made
+      expect(connection).to have_received(:request).with(:get, "/conversations?limit=50")
+      expect(connection).to have_received(:request).with(:get, "/conversations?limit=50&until=2024-01-01T09:00:00Z")
+    end
+
+    it "stops when all items have same timestamp as until token" do
+      # Single page where all items have the same timestamp as the until token
+      page1 = {
+        messages: Array.new(60) { |i| { id: i, created_at: "2024-01-01T10:00:00Z" } },
+        next: { until: "2024-01-01T10:00:00Z" }
+      }
+
+      allow(connection).to receive(:request).with(:get, "/messages?limit=50").and_return(page1)
+
+      pages = []
+      described_class.each_page(
+        path: "/messages",
+        params: { limit: 50 },
+        client: client
+      ) do |page|
+        pages << page
+      end
+
+      expect(pages.size).to eq(1)
+      expect(pages[0][:messages].size).to eq(60)
+
+      # Should only make one request since all items have same timestamp
+      expect(connection).to have_received(:request).with(:get, "/messages?limit=50")
+      expect(connection).not_to have_received(:request).with(:get, "/messages?limit=50&until=2024-01-01T10:00:00Z")
+    end
+  end
 end

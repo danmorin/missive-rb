@@ -314,6 +314,38 @@ RSpec.describe Missive do
       end
     end
 
+    describe "#conversations" do
+      it "memoizes the conversations resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        conversations1 = client.conversations
+        conversations2 = client.conversations
+        expect(conversations1).to be(conversations2)
+      end
+
+      it "creates Conversations resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        conversations = client.conversations
+        expect(conversations).to be_a(Missive::Resources::Conversations)
+        expect(conversations.client).to eq(client)
+      end
+    end
+
+    describe "#messages" do
+      it "memoizes the messages resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        messages1 = client.messages
+        messages2 = client.messages
+        expect(messages1).to be(messages2)
+      end
+
+      it "creates Messages resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        messages = client.messages
+        expect(messages).to be_a(Missive::Resources::Messages)
+        expect(messages.client).to eq(client)
+      end
+    end
+
     describe "multiple clients" do
       it "creates clients with different tokens and separate connection objects" do
         client1 = Missive::Client.new(api_token: "token1")

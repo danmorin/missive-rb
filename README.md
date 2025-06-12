@@ -8,6 +8,8 @@ A Ruby client library for the Missive API, providing thread-safe connection mana
 - **Contacts** - Create, update, list, and retrieve contacts  
 - **Contact Books** - List available contact books
 - **Contact Groups** - List groups and organizations within contact books
+- **Conversations** - List, retrieve conversations and access their messages and comments
+- **Messages** - Create messages (for custom channels), retrieve messages, and search by email message ID
 
 ## Installation
 
@@ -152,9 +154,191 @@ client.contact_groups.each_item(
 end
 ```
 
-### Pagination
+### Working with Conversations
 
-For API endpoints that return paginated results, you can use the `Missive::Paginator` module:
+The Conversations API allows you to list conversations, retrieve individual conversations, and access their messages and comments:
+
+```ruby
+# List conversations in your inbox
+conversations = client.conversations.list(inbox: true, limit: 25)
+conversations.each do |conv|
+  puts "#{conv.subject} - #{conv.latest_message_subject}"
+end
+
+# Get a specific conversation
+conversation = client.conversations.get(id: "c598d004-58d9-4e0f-9f27-c9f926ccf5aa")
+puts "Subject: #{conversation.subject}"
+puts "Messages count: #{conversation.messages_count}"
+
+# Fetch messages within a conversation
+messages = client.conversations.messages(
+  conversation_id: conversation.id,
+  limit: 10  # Max 10 per request
+)
+
+messages.each do |message|
+  puts "From: #{message.from_field&.name} <#{message.from_field&.address}>"
+  puts "Subject: #{message.subject}"
+  puts "Body preview: #{message.preview || message.body&.truncate(100)}"
+  puts "---"
+end
+
+# Fetch comments on a conversation
+comments = client.conversations.comments(
+  conversation_id: conversation.id,
+  limit: 10
+)
+
+comments.each do |comment|
+  puts "Comment by #{comment.author&.name}: #{comment.body&.truncate(100)}"
+end
+
+# Iterate through all conversations with automatic pagination
+client.conversations.each_item(inbox: true) do |conversation|
+  puts "Processing: #{conversation.subject}"
+  # Break after processing 100 conversations
+  break if processed_count >= 100
+end
+
+# Paginate through all messages in a conversation
+client.conversations.each_message(conversation_id: conversation.id) do |message|
+  # Process each message
+  puts "Message #{message.id}: #{message.subject}"
+end
+```
+
+### Working with Messages
+
+The Messages API allows you to retrieve individual messages, search by email message ID, and create messages for custom channels:
+
+```ruby
+# Get a specific message by ID
+message = client.messages.get(id: "78e4a934-4401-3762-afd5-f54950b62528")
+puts "Subject: #{message.subject}"
+puts "From: #{message.from_field.name} <#{message.from_field.address}>"
+puts "To: #{message.to_fields.map { |f| "#{f.name} <#{f.address}>" }.join(", ")}"
+
+# Access message attachments
+message.attachments&.each do |attachment|
+  puts "Attachment: #{attachment.filename} (#{attachment.size} bytes)"
+  puts "URL: #{attachment.url}"
+end
+
+# Search for messages by email message ID
+email_id = "<466FC415-3B23-4B54-ADA5-F6A598329D7F@duoyeah.com>"
+messages = client.messages.list_by_email_message_id(email_message_id: email_id)
+
+messages.each do |msg|
+  puts "Found message: #{msg.subject} (#{msg.id})"
+end
+
+# Create a message for a custom channel (for integrations)
+custom_message = client.messages.create_for_custom_channel(
+  channel_id: "fbf74c47-d0a0-4d77-bf3c-2118025d8102",
+  from_field: { 
+    id: "bot-123", 
+    username: "@supportbot",
+    name: "Support Bot"
+  },
+  to_fields: [{ 
+    id: "user-456", 
+    username: "@customer",
+    name: "John Doe"
+  }],
+  body: "Hello! This is an automated message from your support system.",
+  subject: "Support Ticket #12345",
+  attachments: [] # Optional
+)
+
+puts "Created message: #{custom_message.id}"
+```
+
+### Advanced Examples
+
+#### Processing Unread Conversations
+
+```ruby
+# Get all unread conversations and mark them as processed
+unread_conversations = client.conversations.list(
+  inbox: true,
+  unread: true,  # Assuming this filter exists in the API
+  limit: 50
+)
+
+unread_conversations.each do |conversation|
+  # Get the latest messages
+  messages = client.conversations.messages(
+    conversation_id: conversation.id,
+    limit: 5
+  )
+  
+  # Process based on content
+  latest_message = messages.first
+  if latest_message&.body&.include?("urgent")
+    puts "⚠️  URGENT: #{conversation.subject}"
+    # Handle urgent messages
+  end
+end
+```
+
+#### Building a Message Thread View
+
+```ruby
+# Reconstruct a conversation thread
+conversation_id = "c598d004-58d9-4e0f-9f27-c9f926ccf5aa"
+
+# Get conversation details
+conv = client.conversations.get(id: conversation_id)
+puts "=== #{conv.subject || conv.latest_message_subject} ==="
+puts "Participants: #{conv.authors.map { |a| a.name }.join(", ")}"
+puts ""
+
+# Get all messages in chronological order
+all_messages = []
+client.conversations.each_message(conversation_id: conversation_id) do |message|
+  all_messages << message
+end
+
+# Display thread
+all_messages.reverse.each do |msg|
+  puts "From: #{msg.from_field&.name} (#{msg.created_at})"
+  puts "Subject: #{msg.subject}" if msg.subject
+  puts msg.body&.truncate(200)
+  puts "-" * 80
+end
+
+# Show comments separately
+puts "\n=== Comments ==="
+client.conversations.each_comment(conversation_id: conversation_id) do |comment|
+  puts "#{comment.author&.name}: #{comment.body}"
+end
+```
+
+#### Export Conversation Data
+
+```ruby
+# Export conversation data for analysis
+require 'csv'
+
+CSV.open("conversations_export.csv", "wb") do |csv|
+  csv << ["ID", "Subject", "Created At", "Message Count", "Authors", "Status"]
+  
+  client.conversations.each_item(inbox: true) do |conv|
+    csv << [
+      conv.id,
+      conv.subject || conv.latest_message_subject,
+      conv.created_at,
+      conv.messages_count,
+      conv.authors.map { |a| a.name }.join("; "),
+      conv.closed_at ? "Closed" : "Open"
+    ]
+  end
+end
+
+puts "Export completed!"
+```
+
+### Pagination
 
 ```ruby
 # Iterate through all pages

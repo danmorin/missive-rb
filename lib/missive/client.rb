@@ -5,6 +5,8 @@ require "missive/constants"
 require "missive/connection"
 require "missive/error"
 require "missive/resources/analytics"
+require "missive/resources/conversations"
+require "missive/resources/messages"
 
 module Missive
   class Client
@@ -40,6 +42,14 @@ module Missive
 
     def contact_groups
       @contact_groups ||= Missive::Resources::ContactGroups.new(self)
+    end
+
+    def conversations
+      @conversations ||= Missive::Resources::Conversations.new(self)
+    end
+
+    def messages
+      @messages ||= Missive::Resources::Messages.new(self)
     end
   end
 end

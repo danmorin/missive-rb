@@ -1,0 +1,65 @@
+name: Full Mutation Testing (Nightly)
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Run at 2 AM UTC daily
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  mutation_full:
+    runs-on: ubuntu-latest
+    name: Full Mutation Test - Ruby 3.2
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+      
+      - name: Run comprehensive mutation tests across all namespaces
+        run: bundle exec mutant run --integration rspec --include lib --require missive 'Missive*'
+        timeout-minutes: 60
+        
+      - name: Generate mutation coverage badge
+        if: always()
+        run: |
+          # Extract mutation score and generate badge
+          SCORE=$(bundle exec mutant run --integration rspec --include lib --require missive --dry-run 'Missive*' | grep -oP 'coverage: \K[\d.]+' || echo "0")
+          echo "MUTATION_SCORE=${SCORE}" >> $GITHUB_ENV
+          
+          # Create badge data
+          if (( $(echo "$SCORE >= 97" | bc -l) )); then
+            COLOR="brightgreen"
+          elif (( $(echo "$SCORE >= 90" | bc -l) )); then
+            COLOR="yellow"
+          else
+            COLOR="red"
+          fi
+          
+          echo "BADGE_COLOR=${COLOR}" >> $GITHUB_ENV
+        
+      - name: Upload mutation results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: mutation-results-full
+          path: |
+            tmp/mutant/
+            mutant.log
+          retention-days: 7
+          
+      - name: Comment on low mutation score
+        if: env.MUTATION_SCORE < 97
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const score = process.env.MUTATION_SCORE;
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Low Mutation Score: ${score}%`,
+              body: `🚨 Mutation testing score dropped to ${score}% (target: ≥97%)\n\nPlease review the mutation testing results and improve test coverage.`
+            });

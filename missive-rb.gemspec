@@ -35,6 +35,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "activesupport", ">= 7.0"
   spec.add_dependency "concurrent-ruby", "~> 1.2"
   spec.add_dependency "faraday", "~> 2.0"
+  spec.add_dependency "faraday-http-cache", "~> 2.5"
   spec.add_dependency "faraday-retry", "~> 2.0"
   spec.add_dependency "mutex_m", "~> 0.2"
   spec.add_dependency "rack", "~> 3.0"

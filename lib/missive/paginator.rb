@@ -59,8 +59,13 @@ module Missive
           next_offset = [next_offset, max_offset].min if max_offset
 
           current_params = current_params.merge(offset: next_offset)
-        else
+        elsif parsed_response.dig(:next, :until)
           # Until-based pagination for conversations, messages, and comments
+          # Check for explicit next cursor first (backward compatibility)
+          next_until = parsed_response.dig(:next, :until)
+          current_params = current_params.merge(until: next_until)
+        else
+          # Fall back to timestamp-based pagination for Missive API endpoints
           # Find data array in common locations for conversations/messages/comments
           data_array = parsed_response[:data] ||
                        parsed_response[:conversations] ||
@@ -73,11 +78,11 @@ module Missive
 
           limit = current_params[:limit] || 25
 
+          # Break if we got fewer items than requested (last page)
+          break if data_array.size < limit
+
           # Determine next cursor based on endpoint type
-          next_until = if parsed_response.dig(:next, :until)
-                         # Standard pagination with explicit next cursor
-                         parsed_response.dig(:next, :until)
-                       elsif parsed_response[:messages] || parsed_response[:comments]
+          next_until = if parsed_response[:messages] || parsed_response[:comments]
                          # Messages/comments use delivered_at timestamp from last item
                          data_array.last[:delivered_at]
                        else
@@ -87,9 +92,6 @@ module Missive
 
           # Break if no next cursor available
           break unless next_until
-
-          # Break if we got fewer items than requested (last page)
-          break if data_array.size < limit
 
           # Break if all items have the same timestamp (boundary condition)
           timestamp_field = if parsed_response[:messages] || parsed_response[:comments]

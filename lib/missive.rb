@@ -8,6 +8,11 @@ require "missive/signature"
 require "missive/resources/contacts"
 require "missive/resources/contact_books"
 require "missive/resources/contact_groups"
+require "missive/resources/drafts"
+require "missive/resources/posts"
+require "missive/resources/shared_labels"
+require "missive/resources/organizations"
+require "missive/resources/responses"
 
 module Missive
   class << self

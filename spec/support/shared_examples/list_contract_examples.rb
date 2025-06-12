@@ -13,7 +13,7 @@ RSpec.shared_examples "a resource with consistent list method" do |resource_clas
   describe "#list contract" do
     let(:mock_response) do
       {
-        data_key => [
+        data_key.to_sym => [
           { "id" => "test-1", "name" => "Test Item 1" },
           { "id" => "test-2", "name" => "Test Item 2" }
         ],
@@ -40,7 +40,7 @@ RSpec.shared_examples "a resource with consistent list method" do |resource_clas
     end
 
     it "handles empty response gracefully" do
-      empty_response = { data_key => [], "offset" => 0, "limit" => 50 }
+      empty_response = { data_key.to_sym => [], "offset" => 0, "limit" => 50 }
       allow(connection).to receive(:request).and_return(empty_response)
 
       result = resource.list(limit: 2)

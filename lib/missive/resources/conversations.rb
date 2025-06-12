@@ -107,7 +107,12 @@ module Missive
         ActiveSupport::Notifications.instrument("missive.conversations.get", id: id) do
           response = client.connection.request(:get, path)
 
-          Missive::Object.new(response, client)
+          # API returns {conversations: [single_conversation]} structure even for GET by ID
+          # Extract the first conversation from the array
+          conversations = response[:conversations] || response["conversations"] || []
+          raise Missive::NotFoundError, "Conversation not found" if conversations.empty?
+
+          Missive::Object.new(conversations.first, client)
         end
       end
 

@@ -157,6 +157,8 @@ GEM
       diff-lcs (~> 1.6)
       parser (>= 3.3.0)
     uri (1.0.3)
+    vcr (6.3.1)
+      base64
     webmock (3.25.1)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
@@ -178,6 +180,7 @@ DEPENDENCIES
   rubocop-rails (~> 2.15)
   simplecov (~> 0.22)
   timecop (~> 0.9)
+  vcr (~> 6.1)
   webmock (~> 3.18)
 
 BUNDLED WITH

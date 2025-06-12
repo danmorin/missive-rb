@@ -104,11 +104,15 @@ RSpec.describe Missive::Resources::Responses do
     let(:response_id) { "resp-123" }
     let(:response_data) do
       {
-        "id" => "resp-123",
-        "name" => "Auto Response",
-        "body" => "Thank you for your message",
-        "attachments" => [
-          { "inline_image" => "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA..." }
+        "responses" => [
+          {
+            "id" => "resp-123",
+            "name" => "Auto Response",
+            "body" => "Thank you for your message",
+            "attachments" => [
+              { "inline_image" => "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA..." }
+            ]
+          }
         ]
       }
     end

@@ -16,14 +16,17 @@ module Missive
       #
       # @param limit [Integer] Number of organizations per page (max: 200)
       # @param offset [Integer] Starting position for pagination
-      # @return [Hash] Page hash with data array and pagination info
+      # @return [Array<Missive::Object>] Array of organization objects for the current page
       def list(limit: 50, offset: 0)
         raise ArgumentError, "limit cannot exceed 200" if limit > 200
 
         params = { limit: limit, offset: offset }
 
         ActiveSupport::Notifications.instrument("missive.organizations.list", params: params) do
-          @client.connection.request(:get, LIST, params: params)
+          response = @client.connection.request(:get, LIST, params: params)
+
+          # Return array of Missive::Object instances
+          (response[:organizations] || []).map { |org| Missive::Object.new(org, @client) }
         end
       end
 

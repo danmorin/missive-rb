@@ -28,6 +28,7 @@ Metrics/MethodLength:
   Max: 20
   Exclude:
     - "lib/missive/paginator.rb" # Complex pagination logic
+    - "lib/missive/resources/drafts.rb" # Comprehensive API parameter handling
 
 Metrics/BlockLength:
   Max: 50
@@ -45,12 +46,23 @@ Metrics/CyclomaticComplexity:
     - "lib/missive/paginator.rb" # Complex pagination logic
     - "lib/missive/resources/contacts.rb" # Validation logic
 
+Metrics/ClassLength:
+  Max: 100
+  Exclude:
+    - "lib/missive/resources/drafts.rb" # Comprehensive Draft API implementation
+
+Metrics/ParameterLists:
+  Max: 5
+  Exclude:
+    - "lib/missive/resources/drafts.rb" # Draft API requires 28 parameters per spec
+
 Metrics/PerceivedComplexity:
   Max: 8
   Exclude:
     - "lib/missive/paginator.rb" # Complex pagination logic
     - "lib/missive/resources/contact_groups.rb" # Validation logic
     - "lib/missive/resources/contacts.rb" # Validation logic
+    - "lib/missive/resources/drafts.rb" # Complex validation for 28 API parameters
 
 Layout/LineLength:
   Max: 130

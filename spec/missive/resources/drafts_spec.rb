@@ -85,12 +85,10 @@ RSpec.describe Missive::Resources::Drafts do
     end
 
     context "with attachments" do
-      it "validates each attachment has valid content" do
+      it "validates each attachment has base64_data and filename" do
         valid_attachments = [
-          { text: "Plain text attachment" },
-          { markdown: "**Bold** text" },
-          { image_url: "https://example.com/image.png" },
-          { fields: [{ key: "status", value: "active" }] }
+          { base64_data: "iVBORw0KGgoAAAANS...", filename: "logo.png" },
+          { base64_data: "R0lGODlhAQABAIAAAP///...", filename: "image.gif" }
         ]
 
         allow(connection).to receive(:request).and_return(response_data)
@@ -100,25 +98,52 @@ RSpec.describe Missive::Resources::Drafts do
         end.not_to raise_error
       end
 
-      it "raises error for invalid attachments" do
+      it "raises error for attachments missing base64_data" do
         invalid_attachments = [
-          { invalid_key: "value" }
+          { filename: "logo.png" }
         ]
 
         expect do
           drafts.create(**minimal_params, attachments: invalid_attachments)
-        end.to raise_error(ArgumentError, /Each attachment must include at least one of/)
+        end.to raise_error(ArgumentError, /must include base64_data/)
+      end
+
+      it "raises error for attachments missing filename" do
+        invalid_attachments = [
+          { base64_data: "iVBORw0KGgoAAAANS..." }
+        ]
+
+        expect do
+          drafts.create(**minimal_params, attachments: invalid_attachments)
+        end.to raise_error(ArgumentError, /must include filename/)
+      end
+
+      it "raises error for too many attachments" do
+        many_attachments = Array.new(26) do |i|
+          { base64_data: "data#{i}", filename: "file#{i}.txt" }
+        end
+
+        expect do
+          drafts.create(**minimal_params, attachments: many_attachments)
+        end.to raise_error(ArgumentError, /Maximum 25 attachments allowed/)
+      end
+
+      it "raises error for non-array attachments" do
+        expect do
+          drafts.create(**minimal_params, attachments: "not an array")
+        end.to raise_error(ArgumentError, /attachments must be an array/)
       end
     end
 
-    context "with quote_previous_message" do
-      it "includes the key in payload" do
+    context "with advanced parameters" do
+      it "includes cc_fields and bcc_fields" do
         expected_payload = {
           drafts: {
             body: "Test message",
             to_fields: [{ address: "test@example.com" }],
             from_field: { address: "sender@example.com" },
-            quote_previous_message: true
+            cc_fields: [{ address: "cc@example.com", name: "CC Person" }],
+            bcc_fields: [{ address: "bcc@example.com" }]
           }
         }
 
@@ -128,7 +153,115 @@ RSpec.describe Missive::Resources::Drafts do
           body: expected_payload
         ).and_return(response_data)
 
-        drafts.create(**minimal_params, quote_previous_message: true)
+        drafts.create(
+          **minimal_params,
+          cc_fields: [{ address: "cc@example.com", name: "CC Person" }],
+          bcc_fields: [{ address: "bcc@example.com" }]
+        )
+      end
+
+      it "includes team and organization parameters" do
+        expected_payload = {
+          drafts: {
+            body: "Test message",
+            to_fields: [{ address: "test@example.com" }],
+            from_field: { address: "sender@example.com" },
+            team: "team-123",
+            organization: "org-456",
+            add_users: ["user-789"],
+            add_assignees: ["user-abc"]
+          }
+        }
+
+        expect(connection).to receive(:request).with(
+          :post,
+          "/drafts",
+          body: expected_payload
+        ).and_return(response_data)
+
+        drafts.create(
+          **minimal_params,
+          team: "team-123",
+          organization: "org-456",
+          add_users: ["user-789"],
+          add_assignees: ["user-abc"]
+        )
+      end
+
+      it "includes conversation management parameters" do
+        expected_payload = {
+          drafts: {
+            body: "Test message",
+            to_fields: [{ address: "test@example.com" }],
+            from_field: { address: "sender@example.com" },
+            conversation_subject: "New Subject",
+            conversation_color: "#ff0000",
+            add_to_inbox: true,
+            close: false
+          }
+        }
+
+        expect(connection).to receive(:request).with(
+          :post,
+          "/drafts",
+          body: expected_payload
+        ).and_return(response_data)
+
+        drafts.create(
+          **minimal_params,
+          conversation_subject: "New Subject",
+          conversation_color: "#ff0000",
+          add_to_inbox: true,
+          close: false
+        )
+      end
+
+      it "includes WhatsApp template parameters" do
+        expected_payload = {
+          drafts: {
+            body: "Hello {{1}}, welcome to {{2}}!",
+            to_fields: [{ phone_number: "+18005551234" }],
+            from_field: { phone_number: "+18005559999", type: "whatsapp" },
+            external_response_id: "474808552386201",
+            external_response_variables: { "1" => "John", "2" => "Acme Corp" }
+          }
+        }
+
+        expect(connection).to receive(:request).with(
+          :post,
+          "/drafts",
+          body: expected_payload
+        ).and_return(response_data)
+
+        drafts.create(
+          body: "Hello {{1}}, welcome to {{2}}!",
+          to_fields: [{ phone_number: "+18005551234" }],
+          from_field: { phone_number: "+18005559999", type: "whatsapp" },
+          external_response_id: "474808552386201",
+          external_response_variables: { "1" => "John", "2" => "Acme Corp" }
+        )
+      end
+
+      it "includes references as array" do
+        expected_payload = {
+          drafts: {
+            body: "Test message",
+            to_fields: [{ address: "test@example.com" }],
+            from_field: { address: "sender@example.com" },
+            references: ["<ref-123>", "<ref-456>"]
+          }
+        }
+
+        expect(connection).to receive(:request).with(
+          :post,
+          "/drafts",
+          body: expected_payload
+        ).and_return(response_data)
+
+        drafts.create(
+          **minimal_params,
+          references: ["<ref-123>", "<ref-456>"]
+        )
       end
     end
 
@@ -174,10 +307,74 @@ RSpec.describe Missive::Resources::Drafts do
         expect do
           drafts.create(
             **minimal_params,
-            references: "ref-123",
+            references: ["ref-123"],
             conversation: "conv-456"
           )
         end.to raise_error(ArgumentError, "Cannot pass both references and conversation (mutually exclusive)")
+      end
+
+      it "raises error when references is not an array" do
+        expect do
+          drafts.create(
+            **minimal_params,
+            references: "ref-123"
+          )
+        end.to raise_error(ArgumentError, "references must be an array")
+      end
+
+      it "raises error when send and send_at are both provided" do
+        expect do
+          drafts.create(
+            **minimal_params,
+            send: true,
+            send_at: Time.now.to_i + 3600
+          )
+        end.to raise_error(ArgumentError, "Cannot use both send: true and send_at (mutually exclusive)")
+      end
+
+      it "raises error when auto_followup without send_at" do
+        expect do
+          drafts.create(
+            **minimal_params,
+            auto_followup: true
+          )
+        end.to raise_error(ArgumentError, "auto_followup requires send_at to be specified")
+      end
+
+      it "raises error when send_at is in the past" do
+        expect do
+          drafts.create(
+            **minimal_params,
+            send_at: Time.now.to_i - 3600
+          )
+        end.to raise_error(ArgumentError, "send_at must be in the future")
+      end
+
+      it "raises error when add_users without organization" do
+        expect do
+          drafts.create(
+            **minimal_params,
+            add_users: ["user-123"]
+          )
+        end.to raise_error(ArgumentError, "organization is required when using add_users or add_assignees")
+      end
+
+      it "raises error when add_assignees without organization" do
+        expect do
+          drafts.create(
+            **minimal_params,
+            add_assignees: ["user-123"]
+          )
+        end.to raise_error(ArgumentError, "organization is required when using add_users or add_assignees")
+      end
+
+      it "raises error when add_to_team_inbox without team" do
+        expect do
+          drafts.create(
+            **minimal_params,
+            add_to_team_inbox: true
+          )
+        end.to raise_error(ArgumentError, "team is required when using add_to_team_inbox")
       end
     end
 
@@ -202,6 +399,26 @@ RSpec.describe Missive::Resources::Drafts do
         expect(connection).to receive(:request).with(:post, "/drafts", body: expected_payload)
 
         drafts.create(**minimal_params)
+      end
+    end
+
+    context "response handling" do
+      it "handles response with drafts key" do
+        response_with_drafts = { "drafts" => response_data }
+        allow(connection).to receive(:request).and_return(response_with_drafts)
+
+        result = drafts.create(**minimal_params)
+
+        expect(result).to be_a(Missive::Object)
+        expect(result.id).to eq("12345")
+      end
+
+      it "raises error when draft not created" do
+        allow(connection).to receive(:request).and_return(nil)
+
+        expect do
+          drafts.create(**minimal_params)
+        end.to raise_error(Missive::Error, "Draft not created")
       end
     end
   end
@@ -235,15 +452,57 @@ RSpec.describe Missive::Resources::Drafts do
 
       drafts.send_message(**params)
     end
+  end
 
-    it "calls the send_message method within instrumentation block" do
-      allow(connection).to receive(:request).and_return({ "id" => "123" })
+  describe "#schedule_message" do
+    let(:params) do
+      {
+        body: "Test message",
+        to_fields: [{ address: "test@example.com" }],
+        from_field: { address: "sender@example.com" }
+      }
+    end
 
-      expected_payload = { drafts: { subject: "Test", body: "Test message", to_fields: [{ address: "test@example.com" }],
-                                     from_field: { address: "sender@example.com" }, send: true } }
-      expect(connection).to receive(:request).with(:post, "/drafts", body: expected_payload)
+    let(:send_time) { Time.now.to_i + 3600 }
 
-      drafts.send_message(**params)
+    it "sets send_at in payload" do
+      expected_payload = {
+        drafts: {
+          body: "Test message",
+          to_fields: [{ address: "test@example.com" }],
+          from_field: { address: "sender@example.com" },
+          send_at: send_time,
+          auto_followup: false
+        }
+      }
+
+      expect(connection).to receive(:request).with(
+        :post,
+        "/drafts",
+        body: expected_payload
+      ).and_return({ "id" => "123" })
+
+      drafts.schedule_message(send_at: send_time, **params)
+    end
+
+    it "includes auto_followup when specified" do
+      expected_payload = {
+        drafts: {
+          body: "Test message",
+          to_fields: [{ address: "test@example.com" }],
+          from_field: { address: "sender@example.com" },
+          send_at: send_time,
+          auto_followup: true
+        }
+      }
+
+      expect(connection).to receive(:request).with(
+        :post,
+        "/drafts",
+        body: expected_payload
+      ).and_return({ "id" => "123" })
+
+      drafts.schedule_message(send_at: send_time, auto_followup: true, **params)
     end
   end
 end

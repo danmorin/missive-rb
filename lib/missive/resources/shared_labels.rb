@@ -59,7 +59,7 @@ module Missive
       # @param limit [Integer] Number of labels per page (max: 200)
       # @param offset [Integer] Starting position for pagination
       # @param organization [String, nil] Organization ID to filter by
-      # @return [Hash] Page hash with data array and pagination info
+      # @return [Array<Missive::Object>] Array of shared label objects for the current page
       def list(limit: 50, offset: 0, organization: nil)
         raise ArgumentError, "limit cannot exceed 200" if limit > 200
 
@@ -67,7 +67,10 @@ module Missive
         params[:organization] = organization if organization
 
         ActiveSupport::Notifications.instrument("missive.shared_labels.list", params: params) do
-          @client.connection.request(:get, LIST, params: params)
+          response = @client.connection.request(:get, LIST, params: params)
+
+          # Return array of Missive::Object instances
+          (response[:shared_labels] || []).map { |label| Missive::Object.new(label, @client) }
         end
       end
 

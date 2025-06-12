@@ -4,11 +4,8 @@ RSpec.shared_examples "message endpoint" do
   it "returns array of Missive::Object instances" do
     result = subject
 
-    if result.is_a?(Array)
-      expect(result).to all(be_a(Missive::Object))
-    else
-      expect(result).to be_a(Missive::Object)
-    end
+    expect(result).to be_an(Array)
+    expect(result).to all(be_a(Missive::Object))
   end
 
   it "handles empty messages array in response" do
@@ -16,7 +13,7 @@ RSpec.shared_examples "message endpoint" do
 
     result = subject
 
-    expect(result).to eq([]) if result.is_a?(Array)
+    expect(result).to eq([])
   end
 
   it "handles missing messages key in response" do
@@ -24,7 +21,7 @@ RSpec.shared_examples "message endpoint" do
 
     result = subject
 
-    expect(result).to eq([]) if result.is_a?(Array)
+    expect(result).to eq([])
   end
 
   it "includes Authorization header in request" do

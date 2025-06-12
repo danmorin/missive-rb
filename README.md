@@ -86,7 +86,9 @@ completed_report = client.analytics.wait_for_report(
 # Access the analytics data directly
 puts "Report start: #{completed_report.start}"
 puts "Report end: #{completed_report.end}"
-puts "Metrics: #{completed_report.selected_period.global.totals.metrics}" if completed_report.selected_period
+# Access nested data using dig() method or hash syntax
+metrics = completed_report.dig(:selected_period, :global, :totals, :metrics)
+puts "Metrics: #{metrics}" if metrics
 ```
 
 You can also manually fetch a completed report:
@@ -96,6 +98,20 @@ You can also manually fetch a completed report:
 report = client.analytics.get_report(report_id: 'your-report-id-here')
 puts "Report start: #{report.start}"
 puts "Report end: #{report.end}"
+```
+
+### Contact Books
+
+List available contact books:
+
+```ruby
+# List contact books
+books = client.contact_books.list(limit: 50)
+
+# Iterate through all contact books
+client.contact_books.each_item do |book|
+  puts "Book: #{book.name} (#{book.id})"
+end
 ```
 
 ### Contacts Management
@@ -133,21 +149,7 @@ puts "#{contact.first_name} #{contact.last_name}"
 
 # Iterate through all contacts with pagination
 client.contacts.each_item(contact_book: "book-id-here") do |contact|
-  puts "#{contact.email} - #{contact.first_name} #{contact.last_name}"
-end
-```
-
-### Contact Books
-
-List available contact books:
-
-```ruby
-# List contact books
-books = client.contact_books.list(limit: 50)
-
-# Iterate through all contact books
-client.contact_books.each_item do |book|
-  puts "Book: #{book.name} (#{book.id})"
+  puts "#{contact.first_name} #{contact.last_name}"
 end
 ```
 
@@ -270,44 +272,99 @@ custom_message = client.messages.create_for_custom_channel(
 puts "Created message: #{custom_message.id}"
 ```
 
-### Automating outbound drafts & sending
+### Creating and Sending Drafts
 
-The Drafts API allows you to create and send drafts programmatically:
+The Drafts API provides comprehensive support for email, SMS, WhatsApp, and custom channels with advanced features like scheduling, team management, and file attachments:
 
 ```ruby
-# Create a draft
+# Create a basic email draft
 draft = client.drafts.create(
-  body: "Hello! This is an automated response to your inquiry.",
-  to_fields: [
-    { name: "John Doe", address: "john@example.com" }
-  ],
-  from_field: { name: "Support Team", address: "support@company.com" },
-  subject: "Re: Your inquiry about our services",
-  attachments: [
-    {
-      name: "brochure.pdf",
-      url: "https://storage.example.com/files/brochure.pdf"
-    }
-  ]
+  subject: "Welcome to our service",
+  body: "Hello! Thank you for signing up.",
+  to_fields: [{ address: "customer@example.com", name: "John Doe" }],
+  from_field: { address: "support@company.com", name: "Support Team" }
 )
 
 puts "Draft created: #{draft.id}"
 
-# Send the draft immediately
+# Create draft with file attachments (max 25 files)
+draft_with_files = client.drafts.create(
+  subject: "Your requested documents",
+  body: "Please find the attached documents.",
+  to_fields: [{ address: "client@example.com" }],
+  from_field: { address: "documents@company.com" },
+  cc_fields: [{ address: "manager@company.com", name: "Manager" }],
+  bcc_fields: [{ address: "archive@company.com" }],
+  attachments: [
+    {
+      base64_data: "iVBORw0KGgoAAAANSUhEUgAA...", # Base64 encoded file
+      filename: "contract.pdf"
+    },
+    {
+      base64_data: "R0lGODlhAQABAIAAAAAAAP//...",
+      filename: "logo.png"
+    }
+  ]
+)
+
+# Send immediately
 sent_message = client.drafts.send_message(
-  draft_id: draft.id,
-  send_later: nil  # Send immediately
+  subject: "Urgent: System maintenance tonight",
+  body: "Our systems will be down for maintenance tonight from 2-4 AM EST.",
+  to_fields: [{ address: "all-users@company.com" }],
+  from_field: { address: "alerts@company.com", name: "System Alerts" }
 )
 
 puts "Message sent: #{sent_message.id}"
 
-# Or schedule for later (Unix timestamp)
-scheduled = client.drafts.send_message(
-  draft_id: draft.id,
-  send_later: Time.now.to_i + 3600  # Send in 1 hour
+# Schedule for later delivery
+scheduled_draft = client.drafts.schedule_message(
+  send_at: Time.now.to_i + 3600, # Send in 1 hour
+  auto_followup: true, # Cancel if conversation receives reply
+  subject: "Follow-up on your inquiry",
+  body: "We wanted to follow up on your recent inquiry...",
+  to_fields: [{ address: "prospect@example.com" }],
+  from_field: { address: "sales@company.com" }
 )
 
-puts "Message scheduled: #{scheduled.id}"
+puts "Message scheduled: #{scheduled_draft.id}"
+
+# Create draft for existing conversation with team assignment
+conversation_draft = client.drafts.create(
+  body: "This issue has been escalated to our engineering team.",
+  to_fields: [{ address: "customer@example.com" }],
+  from_field: { address: "support@company.com" },
+  conversation: "existing-conversation-id",
+  team: "engineering-team-id",
+  organization: "company-org-id",
+  add_assignees: ["engineer-user-id"],
+  conversation_color: "warning",
+  add_shared_labels: ["escalated-label-id"]
+)
+
+# WhatsApp template message
+whatsapp_draft = client.drafts.create(
+  body: "Hello {{1}}, your order {{2}} is ready for pickup!",
+  to_fields: [{ phone_number: "+1234567890" }],
+  from_field: { phone_number: "+1987654321", type: "whatsapp" },
+  external_response_id: "474808552386201", # WhatsApp template ID
+  external_response_variables: { "1" => "John", "2" => "#12345" }
+)
+
+# SMS message
+sms_draft = client.drafts.create(
+  body: "Your verification code is: 123456",
+  to_fields: [{ phone_number: "+1234567890" }],
+  from_field: { phone_number: "+1987654321", type: "twilio" }
+)
+
+# Custom channel message (for integrations)
+custom_draft = client.drafts.create(
+  body: "New support ticket created",
+  to_fields: [{ id: "user-123", username: "@johndoe", name: "John Doe" }],
+  from_field: { id: "bot-456", username: "@supportbot", name: "Support Bot" },
+  account: "custom-channel-account-id"
+)
 ```
 
 ### Injecting webhook posts
@@ -499,6 +556,39 @@ updated_task = client.tasks.update(
 )
 
 puts "Task updated: #{updated_task.state}"
+```
+
+## Managing auto-responses
+
+The Responses API allows you to list and retrieve auto-response templates:
+
+```ruby
+# List all auto-responses
+responses = client.responses.list(limit: 50)
+responses.each do |response|
+  puts "Response: #{response.name}"
+end
+
+# List responses for a specific organization
+org_responses = client.responses.list(
+  organization: "your-organization-id-here",
+  limit: 25
+)
+
+# Get a specific response by ID
+response = client.responses.get(id: "your-response-id-here")
+puts "Response name: #{response.name}"
+puts "Response body: #{response.body}"
+
+# Access attachments if present
+response.attachments&.each do |attachment|
+  puts "Attachment: #{attachment['inline_image']}" if attachment['inline_image']
+end
+
+# Iterate through all responses with pagination
+client.responses.each_item(organization: "your-organization-id-here") do |response|
+  puts "Processing response: #{response.name}"
+end
 ```
 
 ## Registering webhooks securely

@@ -58,9 +58,9 @@ require 'missive'
 # Initialize the client with your API token
 client = Missive::Client.new(api_token: 'your_api_token_here')
 
-# Make a simple ping request
-response = client.connection.request(:get, '/ping')
-puts response # => { status: "ok" }
+# List organizations to verify API connection
+organizations = client.organizations.list(limit: 1)
+puts organizations.first.name if organizations.any?
 ```
 
 ### Analytics Quick Start
@@ -70,7 +70,7 @@ The Analytics resource allows you to create and manage analytics reports:
 ```ruby
 # Create an analytics report with Unix timestamps
 report = client.analytics.create_report(
-  organization: '0d9bab85-a74f-4ece-9142-0f9b9f36ff92',
+  organization: 'your-organization-id-here',
   start_time: 1691812800,  # Unix timestamp for report period start
   end_time: 1692371867,    # Unix timestamp for report period end
   time_zone: 'America/Montreal'
@@ -93,7 +93,7 @@ You can also manually fetch a completed report:
 
 ```ruby
 # Get completed report data (returns 404 if not ready)
-report = client.analytics.get_report(report_id: 'abc123')
+report = client.analytics.get_report(report_id: 'your-report-id-here')
 puts "Report start: #{report.start}"
 puts "Report end: #{report.end}"
 ```
@@ -122,13 +122,13 @@ new_contact = client.contacts.create(
 # Update existing contacts
 updated = client.contacts.update(
   contact_hashes: [
-    { id: "contact-id-1", first_name: "Jane" },
-    { id: "contact-id-2", last_name: "Smith" }
+    { id: "your-contact-id-1", first_name: "Jane" },
+    { id: "your-contact-id-2", last_name: "Smith" }
   ]
 )
 
 # Get a specific contact
-contact = client.contacts.get(id: "contact-id-here")
+contact = client.contacts.get(id: "your-contact-id-here")
 puts "#{contact.first_name} #{contact.last_name}"
 
 # Iterate through all contacts with pagination
@@ -183,13 +183,13 @@ conversations.each do |conv|
 end
 
 # Get a specific conversation
-conversation = client.conversations.get(id: "c598d004-58d9-4e0f-9f27-c9f926ccf5aa")
+conversation = client.conversations.get(id: "your-conversation-id-here")
 puts "Subject: #{conversation.subject}"
 puts "Messages count: #{conversation.messages_count}"
 
 # Fetch messages within a conversation
 messages = client.conversations.messages(
-  conversation_id: conversation.id,
+  conversation_id: "your-conversation-id-here",
   limit: 10  # Max 10 per request
 )
 
@@ -202,7 +202,7 @@ end
 
 # Fetch comments on a conversation
 comments = client.conversations.comments(
-  conversation_id: conversation.id,
+  conversation_id: "your-conversation-id-here",
   limit: 10
 )
 
@@ -218,7 +218,7 @@ client.conversations.each_item(inbox: true) do |conversation|
 end
 
 # Paginate through all messages in a conversation
-client.conversations.each_message(conversation_id: conversation.id) do |message|
+client.conversations.each_message(conversation_id: "your-conversation-id-here") do |message|
   # Process each message
   puts "Message #{message.id}: #{message.subject}"
 end
@@ -230,7 +230,7 @@ The Messages API allows you to retrieve individual messages, search by email mes
 
 ```ruby
 # Get a specific message by ID
-message = client.messages.get(id: "78e4a934-4401-3762-afd5-f54950b62528")
+message = client.messages.get(id: "your-message-id-here")
 puts "Subject: #{message.subject}"
 puts "From: #{message.from_field.name} <#{message.from_field.address}>"
 puts "To: #{message.to_fields.map { |f| "#{f.name} <#{f.address}>" }.join(", ")}"
@@ -251,7 +251,7 @@ end
 
 # Create a message for a custom channel (for integrations)
 custom_message = client.messages.create_for_custom_channel(
-  channel_id: "fbf74c47-d0a0-4d77-bf3c-2118025d8102",
+  channel_id: "your-channel-id-here",
   from_field: { 
     id: "bot-123", 
     username: "@supportbot",
@@ -319,7 +319,7 @@ The Posts API allows you to inject posts into conversations for webhook integrat
 post = client.posts.create(
   text: nil,  # Use markdown instead
   markdown: "## Alert: Server Issue\n\n**Server:** web-01\n**Status:** High CPU usage detected\n**Time:** #{Time.now}",
-  conversation: "c598d004-58d9-4e0f-9f27-c9f926ccf5aa",
+  conversation: "your-conversation-id-here",
   notification: {
     title: "Server Alert",
     body: "High CPU usage detected on web-01"
@@ -341,11 +341,11 @@ attachment_post = client.posts.create(
       url: "https://logs.example.com/errors/latest.txt"
     }
   ],
-  conversation: "c598d004-58d9-4e0f-9f27-c9f926ccf5aa"
+  conversation: "your-conversation-id-here"
 )
 
 # Delete a post if needed (e.g., false alarm)
-client.posts.delete(id: post.id)
+client.posts.delete(id: "your-post-id-here")
 puts "Post deleted"
 ```
 
@@ -381,7 +381,7 @@ end
 
 ```ruby
 # Reconstruct a conversation thread
-conversation_id = "c598d004-58d9-4e0f-9f27-c9f926ccf5aa"
+conversation_id = "your-conversation-id-here"
 
 # Get conversation details
 conv = client.conversations.get(id: conversation_id)
@@ -474,8 +474,8 @@ The Tasks API allows you to create and update tasks programmatically:
 # Create a standalone task assigned to a team
 task = client.tasks.create(
   title: "Follow up with client about proposal",
-  team: "team-123",
-  organization: "org-456",
+  team: "your-team-id-here",
+  organization: "your-organization-id-here",
   description: "Review the proposal and schedule a follow-up meeting",
   due_at: (Time.now + 7.days).iso8601
 )
@@ -486,13 +486,13 @@ puts "Task created: #{task.id}"
 subtask = client.tasks.create(
   title: "Review attached documents",
   subtask: true,
-  conversation: "conv-789",
+  conversation: "your-conversation-id-here",
   state: "todo"
 )
 
 # Update task status and details
 updated_task = client.tasks.update(
-  id: task.id,
+  id: "your-task-id-here",
   state: "done",
   title: "Updated: Follow up completed",
   description: "Meeting scheduled for next week"
@@ -510,17 +510,17 @@ The Hooks API and WebhookServer middleware provide secure webhook management:
 comment_hook = client.hooks.create(
   type: "new_comment",
   url: "https://your-app.com/webhooks/comments",
-  organization: "org-123"
+  organization: "your-organization-id-here"
 )
 
 email_hook = client.hooks.create(
   type: "incoming_email",
   url: "https://your-app.com/webhooks/emails",
-  mailbox: "inbox-456"
+  mailbox: "your-mailbox-id-here"
 )
 
 # Delete a webhook when no longer needed
-client.hooks.delete(id: comment_hook.id)
+client.hooks.delete(id: "your-hook-id-here")
 ```
 
 ### Setting up webhook validation
@@ -588,21 +588,21 @@ gem install missive-rb
 echo "api_token: your-token-here" > ~/.missive.yml
 
 # List teams
-missive teams list --limit 10 --organization org-123
+missive teams list --limit 10 --organization your-organization-id-here
 
 # List users
-missive users list --limit 20 --organization org-123
+missive users list --limit 20 --organization your-organization-id-here
 
 # Create a task
 missive tasks create \
   --title "Review customer feedback" \
-  --team team-456 \
-  --organization org-123 \
+  --team your-team-id-here \
+  --organization your-organization-id-here \
   --description "Analyze the latest survey results"
 
 # Update a task
 missive tasks update \
-  --id task-123 \
+  --id your-task-id-here \
   --state done \
   --title "Updated task title"
 
@@ -610,23 +610,23 @@ missive tasks update \
 missive hooks create \
   --type new_comment \
   --url https://your-app.com/webhooks/comments \
-  --organization org-123
+  --organization your-organization-id-here
 
 # Delete a webhook
-missive hooks delete hook-789
+missive hooks delete your-hook-id-here
 
 # Sync contacts to stdout as JSON
 missive contacts sync --since 2024-01-01 --limit 100
 
 # Export conversation data
 missive conversations export \
-  --id conv-123 \
+  --id your-conversation-id-here \
   --file conversation_backup.json
 
 # Generate analytics report and wait for completion
 missive analytics report \
   --type email_volume \
-  --organization org-123 \
+  --organization your-organization-id-here \
   --wait \
   --timeout 300
 ```

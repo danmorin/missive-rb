@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require_relative "../../support/shared_examples/list_endpoint_examples"
 
 RSpec.describe Missive::Resources::ContactGroups do
   let(:client) { instance_double("Missive::Client") }
@@ -34,7 +33,21 @@ RSpec.describe Missive::Resources::ContactGroups do
     let(:list_path) { "/contact_groups" }
     let(:required_list_params) { { contact_book: contact_book_id, kind: "group" } }
 
-    it_behaves_like "a list endpoint", :contact_groups
+    it "sends GET request with default parameters" do
+      expect(connection).to receive(:request).with(
+        :get,
+        "/contact_groups",
+        params: { contact_book: contact_book_id, kind: "group", limit: 50, offset: 0 }
+      ).and_return(response)
+
+      contact_groups.list(contact_book: contact_book_id, kind: "group")
+    end
+
+    it "raises ArgumentError when limit exceeds 200" do
+      expect do
+        contact_groups.list(contact_book: contact_book_id, kind: "group", limit: 201)
+      end.to raise_error(ArgumentError, "limit cannot exceed 200")
+    end
 
     it "raises ArgumentError when contact_book is nil" do
       expect do
@@ -95,7 +108,22 @@ RSpec.describe Missive::Resources::ContactGroups do
     let(:data_key) { :contact_groups }
     let(:required_params) { { contact_book: contact_book_id, kind: "group" } }
 
-    it_behaves_like "a paginated list endpoint"
+    it "raises ArgumentError when limit exceeds 200" do
+      expect do
+        contact_groups.each_item(contact_book: contact_book_id, kind: "group", limit: 201) { |_| } # rubocop:disable Lint/EmptyBlock
+      end.to raise_error(ArgumentError, "limit cannot exceed 200")
+    end
+
+    it "calls Paginator.each_item with correct parameters" do
+      expect(Missive::Paginator).to receive(:each_item).with(
+        path: "/contact_groups",
+        client: client,
+        params: { contact_book: contact_book_id, kind: "group", limit: 50 },
+        data_key: :contact_groups
+      )
+
+      contact_groups.each_item(contact_book: contact_book_id, kind: "group") { |_| } # rubocop:disable Lint/EmptyBlock
+    end
 
     let(:page2) do
       {

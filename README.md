@@ -10,6 +10,11 @@ A Ruby client library for the Missive API, providing thread-safe connection mana
 - **Contact Groups** - List groups and organizations within contact books
 - **Conversations** - List, retrieve conversations and access their messages and comments
 - **Messages** - Create messages (for custom channels), retrieve messages, and search by email message ID
+- **Drafts** - Create and send drafts
+- **Posts** - Create and delete posts
+- **SharedLabels** - Create, update, and list shared labels
+- **Organizations** - List organizations
+- **Responses** - List and retrieve response templates
 
 ## Installation
 
@@ -251,6 +256,85 @@ custom_message = client.messages.create_for_custom_channel(
 )
 
 puts "Created message: #{custom_message.id}"
+```
+
+### Automating outbound drafts & sending
+
+The Drafts API allows you to create and send drafts programmatically:
+
+```ruby
+# Create a draft
+draft = client.drafts.create(
+  body: "Hello! This is an automated response to your inquiry.",
+  to_fields: [
+    { name: "John Doe", address: "john@example.com" }
+  ],
+  from_field: { name: "Support Team", address: "support@company.com" },
+  subject: "Re: Your inquiry about our services",
+  attachments: [
+    {
+      name: "brochure.pdf",
+      url: "https://storage.example.com/files/brochure.pdf"
+    }
+  ]
+)
+
+puts "Draft created: #{draft.id}"
+
+# Send the draft immediately
+sent_message = client.drafts.send_message(
+  draft_id: draft.id,
+  send_later: nil  # Send immediately
+)
+
+puts "Message sent: #{sent_message.id}"
+
+# Or schedule for later (Unix timestamp)
+scheduled = client.drafts.send_message(
+  draft_id: draft.id,
+  send_later: Time.now.to_i + 3600  # Send in 1 hour
+)
+
+puts "Message scheduled: #{scheduled.id}"
+```
+
+### Injecting webhook posts
+
+The Posts API allows you to inject posts into conversations for webhook integrations:
+
+```ruby
+# Create a webhook post with markdown content
+post = client.posts.create(
+  text: nil,  # Use markdown instead
+  markdown: "## Alert: Server Issue\n\n**Server:** web-01\n**Status:** High CPU usage detected\n**Time:** #{Time.now}",
+  conversation: "c598d004-58d9-4e0f-9f27-c9f926ccf5aa",
+  notification: {
+    title: "Server Alert",
+    body: "High CPU usage detected on web-01"
+  }
+)
+
+puts "Webhook post created: #{post.id}"
+
+# Create a post with attachments (e.g., graphs, logs)
+attachment_post = client.posts.create(
+  text: "System monitoring report attached",
+  attachments: [
+    {
+      name: "cpu_graph.png",
+      url: "https://monitoring.example.com/graphs/cpu_usage.png"
+    },
+    {
+      name: "error_log.txt",
+      url: "https://logs.example.com/errors/latest.txt"
+    }
+  ],
+  conversation: "c598d004-58d9-4e0f-9f27-c9f926ccf5aa"
+)
+
+# Delete a post if needed (e.g., false alarm)
+client.posts.delete(id: post.id)
+puts "Post deleted"
 ```
 
 ### Advanced Examples

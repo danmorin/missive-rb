@@ -2,7 +2,6 @@
 
 require "spec_helper"
 require "webmock/rspec"
-require_relative "../../support/shared_examples/list_endpoint_examples"
 require_relative "../../support/shared_examples/message_endpoint_examples"
 
 RSpec.describe Missive::Resources::Conversations do

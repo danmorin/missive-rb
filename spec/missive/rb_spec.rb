@@ -346,6 +346,86 @@ RSpec.describe Missive do
       end
     end
 
+    describe "#drafts" do
+      it "memoizes the drafts resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        drafts1 = client.drafts
+        drafts2 = client.drafts
+        expect(drafts1).to be(drafts2)
+      end
+
+      it "creates Drafts resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        drafts = client.drafts
+        expect(drafts).to be_a(Missive::Resources::Drafts)
+        expect(drafts.instance_variable_get(:@client)).to eq(client)
+      end
+    end
+
+    describe "#posts" do
+      it "memoizes the posts resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        posts1 = client.posts
+        posts2 = client.posts
+        expect(posts1).to be(posts2)
+      end
+
+      it "creates Posts resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        posts = client.posts
+        expect(posts).to be_a(Missive::Resources::Posts)
+        expect(posts.instance_variable_get(:@client)).to eq(client)
+      end
+    end
+
+    describe "#shared_labels" do
+      it "memoizes the shared_labels resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        labels1 = client.shared_labels
+        labels2 = client.shared_labels
+        expect(labels1).to be(labels2)
+      end
+
+      it "creates SharedLabels resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        labels = client.shared_labels
+        expect(labels).to be_a(Missive::Resources::SharedLabels)
+        expect(labels.instance_variable_get(:@client)).to eq(client)
+      end
+    end
+
+    describe "#organizations" do
+      it "memoizes the organizations resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        orgs1 = client.organizations
+        orgs2 = client.organizations
+        expect(orgs1).to be(orgs2)
+      end
+
+      it "creates Organizations resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        orgs = client.organizations
+        expect(orgs).to be_a(Missive::Resources::Organizations)
+        expect(orgs.instance_variable_get(:@client)).to eq(client)
+      end
+    end
+
+    describe "#responses" do
+      it "memoizes the responses resource instance" do
+        client = Missive::Client.new(api_token: "test_token")
+        responses1 = client.responses
+        responses2 = client.responses
+        expect(responses1).to be(responses2)
+      end
+
+      it "creates Responses resource with correct client" do
+        client = Missive::Client.new(api_token: "test_token")
+        responses = client.responses
+        expect(responses).to be_a(Missive::Resources::Responses)
+        expect(responses.instance_variable_get(:@client)).to eq(client)
+      end
+    end
+
     describe "multiple clients" do
       it "creates clients with different tokens and separate connection objects" do
         client1 = Missive::Client.new(api_token: "token1")

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require_relative "../../support/shared_examples/list_endpoint_examples"
 
 RSpec.describe Missive::Resources::Contacts do
   let(:client) { instance_double("Missive::Client") }
@@ -311,7 +310,21 @@ RSpec.describe Missive::Resources::Contacts do
     end
     let(:list_path) { "/contacts" }
 
-    it_behaves_like "a list endpoint", :contacts
+    it "sends GET request with default parameters" do
+      expect(connection).to receive(:request).with(
+        :get,
+        "/contacts",
+        params: { limit: 50, offset: 0 }
+      ).and_return(response)
+
+      contacts.list
+    end
+
+    it "raises ArgumentError when limit exceeds 200" do
+      expect do
+        contacts.list(limit: 201)
+      end.to raise_error(ArgumentError, "limit cannot exceed 200")
+    end
 
     it "validates modified_since is numeric" do
       expect do
@@ -346,7 +359,22 @@ RSpec.describe Missive::Resources::Contacts do
     let(:data_key) { :contacts }
     let(:required_params) { {} }
 
-    it_behaves_like "a paginated list endpoint"
+    it "raises ArgumentError when limit exceeds 200" do
+      expect do
+        contacts.each_item(limit: 201) { |_| } # rubocop:disable Lint/EmptyBlock
+      end.to raise_error(ArgumentError, "limit cannot exceed 200")
+    end
+
+    it "calls Paginator.each_item with correct parameters" do
+      expect(Missive::Paginator).to receive(:each_item).with(
+        path: "/contacts",
+        client: client,
+        params: { limit: 50 },
+        data_key: :contacts
+      )
+
+      contacts.each_item { |_| } # rubocop:disable Lint/EmptyBlock
+    end
 
     let(:page2) do
       {

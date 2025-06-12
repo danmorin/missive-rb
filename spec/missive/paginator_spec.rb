@@ -234,10 +234,9 @@ RSpec.describe Missive::Paginator do
     end
 
     it "stops when all items have same timestamp as until token" do
-      # Single page where all items have the same timestamp as the until token
+      # Single page where all items have the same timestamp - no explicit next.until
       page1 = {
-        messages: Array.new(60) { |i| { id: i, created_at: "2024-01-01T10:00:00Z" } },
-        next: { until: "2024-01-01T10:00:00Z" }
+        messages: Array.new(60) { |i| { id: i, delivered_at: "2024-01-01T10:00:00Z" } }
       }
 
       allow(connection).to receive(:request).with(:get, "/messages?limit=50").and_return(page1)

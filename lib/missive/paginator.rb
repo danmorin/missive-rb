@@ -15,7 +15,7 @@ module Missive
       current_params = params.dup
       pagination_style = nil
 
-      loop do
+      loop do # rubocop:disable Metrics/BlockLength
         break if max_pages && page_number > max_pages
 
         url = build_url(path, current_params)
@@ -59,13 +59,13 @@ module Missive
           next_offset = [next_offset, max_offset].min if max_offset
 
           current_params = current_params.merge(offset: next_offset)
-        else
-          # Enhanced until-based pagination for conversations, messages, and comments
-          # that may return more than the requested limit
-          break unless parsed_response.dig(:next, :until)
-
+        elsif parsed_response.dig(:next, :until)
+          # Until-based pagination for conversations, messages, and comments
+          # Check for explicit next cursor first (backward compatibility)
           next_until = parsed_response.dig(:next, :until)
-
+          current_params = current_params.merge(until: next_until)
+        else
+          # Fall back to timestamp-based pagination for Missive API endpoints
           # Find data array in common locations for conversations/messages/comments
           data_array = parsed_response[:data] ||
                        parsed_response[:conversations] ||
@@ -73,17 +73,34 @@ module Missive
                        parsed_response[:comments] ||
                        []
 
+          # Break if no data returned
+          break if data_array.empty?
+
           limit = current_params[:limit] || 25
 
-          # Enhanced pagination logic for endpoints that may exceed limit:
-          # Only apply enhanced logic if we actually have data that could exceed limit
-          # Check if all items have the same timestamp as the 'until' token
-          # This indicates we've reached the boundary of items with identical timestamps
-          if (data_array.size >= limit) && data_array.all? do |item|
-            [item[:created_at], item[:updated_at]].include?(next_until)
-          end
-            break
-          end
+          # Break if we got fewer items than requested (last page)
+          break if data_array.size < limit
+
+          # Determine next cursor based on endpoint type
+          next_until = if parsed_response[:messages] || parsed_response[:comments]
+                         # Messages/comments use delivered_at timestamp from last item
+                         data_array.last[:delivered_at]
+                       else
+                         # Conversations and other endpoints may use created_at or updated_at
+                         data_array.last[:created_at] || data_array.last[:updated_at]
+                       end
+
+          # Break if no next cursor available
+          break unless next_until
+
+          # Break if all items have the same timestamp (boundary condition)
+          timestamp_field = if parsed_response[:messages] || parsed_response[:comments]
+                              :delivered_at
+                            else
+                              :created_at
+                            end
+
+          break if data_array.all? { |item| item[timestamp_field] == next_until }
 
           current_params = current_params.merge(until: next_until)
         end

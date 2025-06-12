@@ -110,25 +110,23 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#each_item" do
     let(:page1) do
       {
-        conversations: [
-          { id: "conv-1", subject: "Test Subject 1" },
-          { id: "conv-2", subject: "Test Subject 2" }
-        ],
-        next: { until: "token1" }
+        conversations: Array.new(25) do |i|
+          { id: "conv-#{i + 1}", subject: "Test Subject #{i + 1}", created_at: 1_563_806_400 - (i * 10) }
+        end
       }
     end
 
     let(:page2) do
       {
         conversations: [
-          { id: "conv-3", subject: "Test Subject 3" }
+          { id: "conv-26", subject: "Test Subject 26", created_at: 1_563_806_150 }
         ]
       }
     end
 
     before do
       allow(connection).to receive(:request).with(:get, "/conversations?inbox=true&limit=25").and_return(page1)
-      allow(connection).to receive(:request).with(:get, "/conversations?inbox=true&limit=25&until=token1").and_return(page2)
+      allow(connection).to receive(:request).with(:get, "/conversations?inbox=true&limit=25&until=1563806160").and_return(page2)
     end
 
     it "paginates through all conversations" do
@@ -137,9 +135,10 @@ RSpec.describe Missive::Resources::Conversations do
         conversations << conversation
       end
 
-      expect(conversations.size).to eq(3)
+      expect(conversations.size).to eq(26)
       expect(conversations).to all(be_a(Missive::Object))
-      expect(conversations.map(&:id)).to eq(%w[conv-1 conv-2 conv-3])
+      expect(conversations.first.id).to eq("conv-1")
+      expect(conversations.last.id).to eq("conv-26")
     end
 
     it "raises ArgumentError when limit exceeds 50" do
@@ -275,18 +274,16 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#each_message" do
     let(:page1) do
       {
-        messages: [
-          { id: "msg-1", body: "Test message 1" },
-          { id: "msg-2", body: "Test message 2" }
-        ],
-        next: { until: "token1" }
+        messages: Array.new(10) do |i|
+          { id: "msg-#{i + 1}", body: "Test message #{i + 1}", delivered_at: 1_563_806_400 - (i * 10) }
+        end
       }
     end
 
     let(:page2) do
       {
         messages: [
-          { id: "msg-3", body: "Test message 3" }
+          { id: "msg-11", body: "Test message 11", delivered_at: 1_563_806_300 }
         ]
       }
     end
@@ -294,7 +291,7 @@ RSpec.describe Missive::Resources::Conversations do
     before do
       allow(connection).to receive(:request).with(:get, "/conversations/conv-123/messages?limit=10").and_return(page1)
       allow(connection).to receive(:request).with(:get,
-                                                  "/conversations/conv-123/messages?limit=10&until=token1").and_return(page2)
+                                                  "/conversations/conv-123/messages?limit=10&until=1563806310").and_return(page2)
     end
 
     it "paginates through all messages" do
@@ -303,9 +300,10 @@ RSpec.describe Missive::Resources::Conversations do
         messages << message
       end
 
-      expect(messages.size).to eq(3)
+      expect(messages.size).to eq(11)
       expect(messages).to all(be_a(Missive::Object))
-      expect(messages.map(&:id)).to eq(%w[msg-1 msg-2 msg-3])
+      expect(messages.first.id).to eq("msg-1")
+      expect(messages.last.id).to eq("msg-11")
     end
 
     it "raises ArgumentError when limit exceeds 10" do
@@ -406,18 +404,16 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#each_comment" do
     let(:page1) do
       {
-        comments: [
-          { id: "comment-1", body: "Test comment 1" },
-          { id: "comment-2", body: "Test comment 2" }
-        ],
-        next: { until: "token1" }
+        comments: Array.new(10) do |i|
+          { id: "comment-#{i + 1}", body: "Test comment #{i + 1}", delivered_at: 1_563_806_400 - (i * 10) }
+        end
       }
     end
 
     let(:page2) do
       {
         comments: [
-          { id: "comment-3", body: "Test comment 3" }
+          { id: "comment-11", body: "Test comment 11", delivered_at: 1_563_806_300 }
         ]
       }
     end
@@ -425,7 +421,7 @@ RSpec.describe Missive::Resources::Conversations do
     before do
       allow(connection).to receive(:request).with(:get, "/conversations/conv-123/comments?limit=10").and_return(page1)
       allow(connection).to receive(:request).with(:get,
-                                                  "/conversations/conv-123/comments?limit=10&until=token1").and_return(page2)
+                                                  "/conversations/conv-123/comments?limit=10&until=1563806310").and_return(page2)
     end
 
     it "paginates through all comments" do
@@ -434,9 +430,10 @@ RSpec.describe Missive::Resources::Conversations do
         comments << comment
       end
 
-      expect(comments.size).to eq(3)
+      expect(comments.size).to eq(11)
       expect(comments).to all(be_a(Missive::Object))
-      expect(comments.map(&:id)).to eq(%w[comment-1 comment-2 comment-3])
+      expect(comments.first.id).to eq("comment-1")
+      expect(comments.last.id).to eq("comment-11")
     end
 
     it "raises ArgumentError when limit exceeds 10" do

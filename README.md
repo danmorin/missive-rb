@@ -493,33 +493,49 @@ puts "Export completed!"
 
 ### Pagination
 
+The Paginator class provides low-level pagination support. **Note:** Most resources have their own `each_item` methods that are easier to use and handle resource-specific requirements.
+
 ```ruby
-# Iterate through all pages
-Missive::Paginator.each_page(path: '/conversations', client: client) do |page|
-  puts "Processing page with #{page['data'].length} items"
+# Use resource-specific pagination (recommended)
+client.conversations.each_item(inbox: true, limit: 25) do |conversation|
+  puts "Conversation: #{conversation.subject}"
 end
 
-# Iterate through individual items across all pages
-Missive::Paginator.each_item(path: '/conversations', client: client) do |conversation|
-  puts "Conversation: #{conversation['subject']}"
+# Low-level paginator (requires proper API parameters)
+# Note: Conversations API requires at least one filter like inbox: true
+Missive::Paginator.each_item(
+  path: '/conversations', 
+  client: client, 
+  params: { inbox: true, limit: 25 }
+) do |conversation|
+  puts "Conversation: #{conversation[:subject]}"
 end
 
-# Limit the number of pages or items
+# Iterate through all pages with low-level paginator
 Missive::Paginator.each_page(
-  path: '/conversations',
-  client: client,
-  max_pages: 3,
-  sleep_interval: 1  # Sleep 1 second between pages
+  path: '/conversations', 
+  client: client, 
+  params: { inbox: true, limit: 25 }
 ) do |page|
-  # Process page
+  puts "Processing page with #{page[:conversations].length} items"
 end
 
+# Limit items with resource methods (recommended)
+processed = 0
+client.conversations.each_item(inbox: true) do |conversation|
+  puts "Processing: #{conversation.subject}"
+  processed += 1
+  break if processed >= 100
+end
+
+# Or use low-level paginator with limits
 Missive::Paginator.each_item(
   path: '/conversations',
   client: client,
+  params: { inbox: true },
   max_items: 100
 ) do |conversation|
-  # Process conversation
+  puts "Conversation: #{conversation[:subject]}"
 end
 ```
 
@@ -534,7 +550,7 @@ task = client.tasks.create(
   team: "your-team-id-here",
   organization: "your-organization-id-here",
   description: "Review the proposal and schedule a follow-up meeting",
-  due_at: (Time.now + 7.days).iso8601
+  due_at: (Time.now + 7.days).to_i
 )
 
 puts "Task created: #{task.id}"
@@ -582,7 +598,7 @@ puts "Response body: #{response.body}"
 
 # Access attachments if present
 response.attachments&.each do |attachment|
-  puts "Attachment: #{attachment['inline_image']}" if attachment['inline_image']
+  puts "Attachment: #{attachment[:inline_image]}" if attachment[:inline_image]
 end
 
 # Iterate through all responses with pagination

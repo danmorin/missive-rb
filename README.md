@@ -1,5 +1,7 @@
 # Missive Ruby Client
 
+> **⚠️ Disclaimer:** This library was built with Claude Code and has not been fully tested by humans in production environments. Please log any issues you find. Pull requests are appreciated!
+
 [![Gem Version](https://badge.fury.io/rb/missive-rb.svg)](https://badge.fury.io/rb/missive-rb)
 [![CI](https://github.com/danmorin/missive-rb/workflows/CI/badge.svg)](https://github.com/danmorin/missive-rb/actions)
 [![Coverage](https://codecov.io/gh/danmorin/missive-rb/branch/main/graph/badge.svg)](https://codecov.io/gh/danmorin/missive-rb)

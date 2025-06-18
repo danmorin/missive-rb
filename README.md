@@ -541,6 +541,51 @@ Missive::Paginator.each_item(
 end
 ```
 
+### Concurrent Requests
+
+The library is thread-safe and supports making multiple requests concurrently. The connection pool has built-in concurrency limiting (default: 5 concurrent requests) and thread-safe rate limiting.
+
+```ruby
+# Example 1: Fetch multiple conversations concurrently using threads
+conversation_ids = ["conv1", "conv2", "conv3", "conv4", "conv5"]
+conversations = []
+threads = []
+
+conversation_ids.each do |id|
+  threads << Thread.new do
+    conversations << client.conversations.get(id: id)
+  end
+end
+
+threads.each(&:join)
+puts "Fetched #{conversations.length} conversations concurrently"
+
+# Example 2: Fetch different resource types in parallel
+results = {}
+threads = [
+  Thread.new { results[:conversations] = client.conversations.list(limit: 10) },
+  Thread.new { results[:contacts] = client.contacts.list(limit: 10) },
+  Thread.new { results[:teams] = client.teams.list }
+]
+
+threads.each(&:join)
+puts "Fetched #{results[:conversations].count} conversations, #{results[:contacts].count} contacts, #{results[:teams].count} teams"
+
+# Example 3: Batch create contacts concurrently
+contact_batches = [
+  [{ email: "user1@example.com" }, { email: "user2@example.com" }],
+  [{ email: "user3@example.com" }, { email: "user4@example.com" }]
+]
+
+threads = contact_batches.map do |batch|
+  Thread.new { client.contacts.create(contacts: batch) }
+end
+
+results = threads.map(&:value)
+total_created = results.sum { |r| r["contacts"].size }
+puts "Created #{total_created} contacts concurrently"
+```
+
 ## Managing tasks programmatically
 
 The Tasks API allows you to create and update tasks programmatically:

@@ -548,27 +548,24 @@ The library is thread-safe and supports making multiple requests concurrently. T
 ```ruby
 # Example 1: Fetch multiple conversations concurrently using threads
 conversation_ids = ["conv1", "conv2", "conv3", "conv4", "conv5"]
-conversations = []
-threads = []
 
-conversation_ids.each do |id|
-  threads << Thread.new do
-    conversations << client.conversations.get(id: id)
-  end
+threads = conversation_ids.map do |id|
+  Thread.new { client.conversations.get(id: id) }
 end
 
-threads.each(&:join)
+# Wait for all threads and collect results
+conversations = threads.map(&:value)
 puts "Fetched #{conversations.length} conversations concurrently"
 
 # Example 2: Fetch different resource types in parallel
-results = {}
-threads = [
-  Thread.new { results[:conversations] = client.conversations.list(limit: 10) },
-  Thread.new { results[:contacts] = client.contacts.list(limit: 10) },
-  Thread.new { results[:teams] = client.teams.list }
-]
+threads = {
+  conversations: Thread.new { client.conversations.list(limit: 10) },
+  contacts: Thread.new { client.contacts.list(limit: 10) },
+  teams: Thread.new { client.teams.list }
+}
 
-threads.each(&:join)
+# Wait for all threads and collect results
+results = threads.transform_values(&:value)
 puts "Fetched #{results[:conversations].count} conversations, #{results[:contacts].count} contacts, #{results[:teams].count} teams"
 
 # Example 3: Batch create contacts concurrently

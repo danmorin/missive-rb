@@ -241,7 +241,7 @@ module Missive
       #   client.conversations.close(id: "conv-123", text: "Resolved.")
       def close(id:, **opts)
         validate_id!(id)
-        post_action(id: id, action: :close, default_title: "Conversation closed", opts: opts)
+        post_action(id: id, action: :close, default_title: "Conversation closed", default_text: "Conversation closed via API", opts: opts)
       end
 
       # Reopen a closed conversation
@@ -256,48 +256,68 @@ module Missive
       #   client.conversations.reopen(id: "conv-123")
       def reopen(id:, **opts)
         validate_id!(id)
-        post_action(id: id, action: :reopen, default_title: "Conversation reopened", opts: opts)
+        post_action(id: id, action: :reopen, default_title: "Conversation reopened", default_text: "Conversation reopened via API", opts: opts)
       end
 
       # Add shared labels to a conversation
       #
+      # Missive requires `organization` whenever `add_shared_labels` is set
+      # on a post. The gem enforces this at the API boundary.
+      #
       # @param id [String] The conversation ID
       # @param labels [Array<String>] Non-empty array of shared label IDs
+      # @param organization [String] Organization ID (required by API)
       # @param opts [Hash] Optional pass-through attrs
       # @return [Missive::Object] The created post
-      # @raise [ArgumentError] When id or labels are missing/empty
+      # @raise [ArgumentError] When id, labels, or organization are missing/empty
       # @example
-      #   client.conversations.add_labels(id: "conv-123", labels: ["lbl-1", "lbl-2"])
-      def add_labels(id:, labels:, **opts)
+      #   client.conversations.add_labels(
+      #     id: "conv-123",
+      #     labels: ["lbl-1", "lbl-2"],
+      #     organization: "org-1"
+      #   )
+      def add_labels(id:, labels:, organization:, **opts)
         validate_id!(id)
         validate_id_array!(labels, name: "labels")
+        validate_present!(organization, name: "organization")
         post_action(
           id: id,
           action: :add_shared_labels,
           action_value: labels,
           default_title: "Labels added",
-          opts: opts
+          default_text: "Labels added via API",
+          opts: opts.merge(organization: organization)
         )
       end
 
       # Remove shared labels from a conversation
       #
+      # Missive requires `organization` whenever `remove_shared_labels` is set
+      # on a post. The gem enforces this at the API boundary.
+      #
       # @param id [String] The conversation ID
       # @param labels [Array<String>] Non-empty array of shared label IDs
+      # @param organization [String] Organization ID (required by API)
       # @param opts [Hash] Optional pass-through attrs
       # @return [Missive::Object] The created post
-      # @raise [ArgumentError] When id or labels are missing/empty
+      # @raise [ArgumentError] When id, labels, or organization are missing/empty
       # @example
-      #   client.conversations.remove_labels(id: "conv-123", labels: ["lbl-1"])
-      def remove_labels(id:, labels:, **opts)
+      #   client.conversations.remove_labels(
+      #     id: "conv-123",
+      #     labels: ["lbl-1"],
+      #     organization: "org-1"
+      #   )
+      def remove_labels(id:, labels:, organization:, **opts)
         validate_id!(id)
         validate_id_array!(labels, name: "labels")
+        validate_present!(organization, name: "organization")
         post_action(
           id: id,
           action: :remove_shared_labels,
           action_value: labels,
           default_title: "Labels removed",
-          opts: opts
+          default_text: "Labels removed via API",
+          opts: opts.merge(organization: organization)
         )
       end
 
@@ -327,6 +347,7 @@ module Missive
           action: :add_assignees,
           action_value: users,
           default_title: "Assignees updated",
+          default_text: "Assignees updated via API",
           opts: opts.merge(organization: organization)
         )
       end
@@ -341,7 +362,7 @@ module Missive
       #   client.conversations.add_to_inbox(id: "conv-123")
       def add_to_inbox(id:, **opts)
         validate_id!(id)
-        post_action(id: id, action: :add_to_inbox, default_title: "Moved to inbox", opts: opts)
+        post_action(id: id, action: :add_to_inbox, default_title: "Moved to inbox", default_text: "Moved to inbox via API", opts: opts)
       end
 
       # Move a conversation to a team inbox
@@ -360,6 +381,7 @@ module Missive
           id: id,
           action: :add_to_team_inbox,
           default_title: "Moved to team inbox",
+          default_text: "Moved to team inbox via API",
           opts: opts.merge(team: team)
         )
       end
@@ -409,18 +431,30 @@ module Missive
       DEFAULT_ACTION_NOTIFICATION_BODY = "via Missive API"
 
       # Internal: dispatch a single conversation-action POST /posts call
-      # with the right action attr, organization passthrough, and a default
-      # notification when the caller didn't supply one.
+      # with the right action attr, organization passthrough, and sensible
+      # defaults for the two fields Missive's API requires on every post:
+      #
+      #   1. `notification: {title, body}` — required on every POST /v1/posts.
+      #   2. `text` / `markdown` / `attachments` — required content. Missive's
+      #      API rejects metadata-only posts with
+      #      "Validation failed: text, markdown or attachments needed".
+      #
+      # Caller-supplied values in `opts` always win — pass `text:`, `markdown:`,
+      # `attachments:`, or `notification:` to override the defaults.
       #
       # @param id [String] Conversation ID
       # @param action [Symbol] Action attr key (e.g. :close, :add_shared_labels)
       # @param action_value [Object] Action attr value (defaults to true for booleans)
       # @param default_title [String] Default notification title if caller omits one
+      # @param default_text [String] Default text body if caller didn't supply text/markdown/attachments
       # @param opts [Hash] Caller-supplied additional attrs
       # @return [Missive::Object] The created post
-      def post_action(id:, action:, default_title:, action_value: true, opts: {})
+      def post_action(id:, action:, default_title:, default_text:, action_value: true, opts: {})
         merged = opts.dup
         merged[:notification] ||= { title: default_title, body: DEFAULT_ACTION_NOTIFICATION_BODY }
+        unless merged[:text] || merged[:markdown] || merged[:attachments]
+          merged[:text] = default_text
+        end
         client.posts.create(conversation: id, action => action_value, **merged)
       end
 

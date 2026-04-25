@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [0.2.2]
+
+### Fixed
+
+- **`Resources::Conversations` action methods now auto-inject default `text` content** when the caller doesn't supply `text`/`markdown`/`attachments`. Missive's `POST /v1/posts` requires content on every call (it returns `"Validation failed: text, markdown or attachments needed"` for content-less metadata posts — the v0.2.1 release relied on a docs claim that turned out to be wrong). Caller-supplied `text:`, `markdown:`, or `attachments:` always wins.
+
+### Changed (breaking — minor scope)
+
+- **`Resources::Conversations#add_labels(id:, labels:, organization:, **opts)`** — `organization` is now a required keyword argument. Missive's API returns `"'organization' is required when 'add_shared_labels' is defined"` without it. Callers built against v0.2.0 / v0.2.1 must pass `organization:`.
+- **`Resources::Conversations#remove_labels(id:, labels:, organization:, **opts)`** — same change for symmetry; Missive enforces `organization` on `remove_shared_labels` as well.
+
 ## [0.2.1]
 
 ### Fixed

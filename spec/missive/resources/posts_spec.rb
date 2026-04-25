@@ -117,10 +117,16 @@ RSpec.describe Missive::Resources::Posts do
     end
 
     context "validation errors" do
-      it "raises error when none of the content keys are provided" do
+      it "raises error when neither content nor a conversation-action attr is provided" do
         expect do
           posts.create
-        end.to raise_error(ArgumentError, "At least one of text, markdown, or attachments is required")
+        end.to raise_error(ArgumentError, /At least one of text, markdown, attachments, or a conversation-action attribute/)
+      end
+
+      it "raises error when only unrelated attrs are provided" do
+        expect do
+          posts.create(conversation: "conv-123", organization: "org-1")
+        end.to raise_error(ArgumentError, /At least one of text, markdown, attachments, or a conversation-action attribute/)
       end
 
       it "accepts any combination of content keys" do
@@ -130,6 +136,61 @@ RSpec.describe Missive::Resources::Posts do
         expect { posts.create(text: "text", attachments: []) }.not_to raise_error
         expect { posts.create(markdown: "**markdown**", attachments: []) }.not_to raise_error
         expect { posts.create(text: "text", markdown: "**markdown**", attachments: []) }.not_to raise_error
+      end
+    end
+
+    context "metadata-only conversation-action posts" do
+      before { allow(connection).to receive(:request).and_return(response_data) }
+
+      it "accepts a post with only close: true" do
+        expect { posts.create(conversation: "conv-123", close: true) }.not_to raise_error
+      end
+
+      it "accepts a post with only reopen: true" do
+        expect { posts.create(conversation: "conv-123", reopen: true) }.not_to raise_error
+      end
+
+      it "accepts a post with only add_shared_labels" do
+        expect { posts.create(conversation: "conv-123", add_shared_labels: ["label-1"]) }.not_to raise_error
+      end
+
+      it "accepts a post with only remove_shared_labels" do
+        expect { posts.create(conversation: "conv-123", remove_shared_labels: ["label-1"]) }.not_to raise_error
+      end
+
+      it "accepts a post with only add_assignees + organization" do
+        expect do
+          posts.create(conversation: "conv-123", add_assignees: ["user-1"], organization: "org-1")
+        end.not_to raise_error
+      end
+
+      it "accepts a post with only add_to_inbox" do
+        expect { posts.create(conversation: "conv-123", add_to_inbox: true) }.not_to raise_error
+      end
+
+      it "accepts a post with only add_to_team_inbox + team" do
+        expect do
+          posts.create(conversation: "conv-123", add_to_team_inbox: true, team: "team-1")
+        end.not_to raise_error
+      end
+
+      it "accepts content + action together (e.g. comment + close)" do
+        expect do
+          posts.create(text: "Resolved.", conversation: "conv-123", close: true)
+        end.not_to raise_error
+      end
+
+      it "POSTs the action attrs in the payload" do
+        expected_payload = {
+          posts: {
+            conversation: "conv-123",
+            close: true
+          }
+        }
+
+        expect(connection).to receive(:request).with(:post, "/posts", body: expected_payload).and_return(response_data)
+
+        posts.create(conversation: "conv-123", close: true)
       end
     end
 

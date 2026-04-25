@@ -505,4 +505,68 @@ RSpec.describe Missive::Resources::Drafts do
       drafts.schedule_message(send_at: send_time, auto_followup: true, **params)
     end
   end
+
+  describe "#delete" do
+    let(:draft_id) { "draft-123" }
+
+    context "successful deletion" do
+      it "returns true on 204 response" do
+        allow(connection).to receive(:request).with(:delete, "/drafts/draft-123").and_return(nil)
+
+        expect(drafts.delete(id: draft_id)).to eq(true)
+      end
+
+      it "returns true on 200 response with empty body" do
+        allow(connection).to receive(:request).with(:delete, "/drafts/draft-123").and_return({})
+
+        expect(drafts.delete(id: draft_id)).to eq(true)
+      end
+
+      it "issues correct HTTP verb and path" do
+        expect(connection).to receive(:request).with(:delete, "/drafts/draft-123").and_return(nil)
+
+        drafts.delete(id: draft_id)
+      end
+    end
+
+    context "validation errors" do
+      it "raises ArgumentError when id is nil" do
+        expect { drafts.delete(id: nil) }.to raise_error(ArgumentError, "id is required")
+      end
+
+      it "raises ArgumentError when id is empty string" do
+        expect { drafts.delete(id: "") }.to raise_error(ArgumentError, "id is required")
+      end
+
+      it "raises ArgumentError when id is whitespace only" do
+        expect { drafts.delete(id: "   ") }.to raise_error(ArgumentError, "id is required")
+      end
+    end
+
+    context "error handling" do
+      it "surfaces NotFoundError for 404" do
+        allow(connection).to receive(:request).and_raise(Missive::NotFoundError.new("Draft not found"))
+
+        expect { drafts.delete(id: draft_id) }.to raise_error(Missive::NotFoundError)
+      end
+    end
+
+    context "instrumentation" do
+      it "calls the delete method within instrumentation block" do
+        allow(connection).to receive(:request).and_return(nil)
+
+        events = []
+        ActiveSupport::Notifications.subscribe("missive.drafts.delete") do |*args|
+          events << ActiveSupport::Notifications::Event.new(*args)
+        end
+
+        drafts.delete(id: draft_id)
+
+        expect(events.size).to eq(1)
+        expect(events.first.payload[:id]).to eq(draft_id)
+      ensure
+        ActiveSupport::Notifications.unsubscribe("missive.drafts.delete")
+      end
+    end
+  end
 end

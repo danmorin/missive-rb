@@ -9,6 +9,7 @@ module Missive
     class Drafts
       # Path constants
       CREATE = "/drafts"
+      DELETE = "/drafts/%<id>s"
 
       # Maximum number of attachments allowed per draft
       MAX_ATTACHMENTS = 25
@@ -185,6 +186,25 @@ module Missive
       # @return [Missive::Object] The scheduled draft
       def schedule_message(send_at:, auto_followup: false, **args)
         create(**args, send_at: send_at, auto_followup: auto_followup)
+      end
+
+      # Delete a draft
+      #
+      # @param id [String] The draft ID to delete
+      # @return [Boolean] True if deletion was successful
+      # @raise [ArgumentError] If id is missing or empty
+      # @raise [Missive::NotFoundError] If the draft was not found
+      # @example Delete a draft
+      #   client.drafts.delete(id: "draft-123")
+      def delete(id:)
+        raise ArgumentError, "id is required" if id.nil? || id.to_s.strip.empty?
+
+        path = format(DELETE, id: id)
+
+        ActiveSupport::Notifications.instrument("missive.drafts.delete", id: id) do
+          @client.connection.request(:delete, path)
+          true
+        end
       end
 
       private

@@ -228,6 +228,39 @@ client.conversations.each_message(conversation_id: "your-conversation-id-here") 
 end
 ```
 
+#### Conversation Actions
+
+Missive's REST API mutates conversation state through `POST /posts` (or `POST /conversations/:id/merge` for merges) rather than dedicated `PATCH` endpoints. The gem exposes first-class methods that wrap the right call:
+
+```ruby
+# Close / reopen
+client.conversations.close(id: "conv-123")
+client.conversations.close(id: "conv-123", text: "Resolved.") # with a closing comment
+client.conversations.reopen(id: "conv-123")
+
+# Shared labels (label IDs, not names)
+client.conversations.add_labels(id: "conv-123", labels: ["lbl-1", "lbl-2"])
+client.conversations.remove_labels(id: "conv-123", labels: ["lbl-1"])
+
+# Assign users (organization is required by the API)
+client.conversations.assign(
+  id: "conv-123",
+  users: ["user-1", "user-2"],
+  organization: "org-1"
+)
+
+# Move between inboxes
+client.conversations.add_to_inbox(id: "conv-123")
+client.conversations.add_to_team_inbox(id: "conv-123", team: "team-1")
+
+# Merge (source is the path id; target is the destination)
+client.conversations.merge(id: "src-123", target: "dst-456", subject: "Combined thread")
+```
+
+Each action method (except `merge`) accepts arbitrary `**opts` that pass through to `POST /posts` — useful for attaching a comment, notification, or any other field Missive supports alongside the state change.
+
+**Not exposed**: archive, snooze, mark read/unread, and `remove_assignees` — Missive's REST API does not document endpoints for these operations.
+
 ### Working with Messages
 
 The Messages API allows you to retrieve individual messages, search by email message ID, and create messages for custom channels:
@@ -330,6 +363,9 @@ scheduled_draft = client.drafts.schedule_message(
 )
 
 puts "Message scheduled: #{scheduled_draft.id}"
+
+# Delete a draft
+client.drafts.delete(id: "draft-123")
 
 # Create draft for existing conversation with team assignment
 conversation_draft = client.drafts.create(
@@ -772,6 +808,22 @@ missive contacts sync --since 2024-01-01 --limit 100
 missive conversations export \
   --id your-conversation-id-here \
   --file conversation_backup.json
+
+# Conversation actions
+missive conversations close your-conversation-id-here
+missive conversations close your-conversation-id-here --text "Resolved."
+missive conversations reopen your-conversation-id-here
+missive conversations add-labels your-conversation-id-here --labels label-1 label-2
+missive conversations remove-labels your-conversation-id-here --labels label-1
+missive conversations assign your-conversation-id-here \
+  --users user-1 user-2 \
+  --organization your-organization-id-here
+missive conversations inbox your-conversation-id-here
+missive conversations team-inbox your-conversation-id-here --team your-team-id-here
+missive conversations merge source-conv-id --target dest-conv-id --subject "Combined"
+
+# Delete a draft
+missive drafts delete your-draft-id-here
 
 # Generate analytics report and wait for completion
 missive analytics report \

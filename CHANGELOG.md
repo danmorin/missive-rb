@@ -1,5 +1,30 @@
 ## [Unreleased]
 
+## [0.2.0]
+
+### Added — Conversation Actions
+
+- **`Missive::Resources::Conversations`** gains first-class action methods that wrap Missive's `POST /posts` and `POST /conversations/:id/merge` endpoints:
+  - `#close(id:, **opts)`
+  - `#reopen(id:, **opts)`
+  - `#add_labels(id:, labels:, **opts)`
+  - `#remove_labels(id:, labels:, **opts)`
+  - `#assign(id:, users:, organization:, **opts)`
+  - `#add_to_inbox(id:, **opts)`
+  - `#add_to_team_inbox(id:, team:, **opts)`
+  - `#merge(id:, target:, subject: nil)`
+- **`Missive::Resources::Drafts#delete(id:)`** — `DELETE /drafts/:id`. Returns `true` on success; raises `Missive::NotFoundError` for 404.
+- **CLI commands** for every new SDK method: `missive conversations close|reopen|add-labels|remove-labels|assign|inbox|team-inbox|merge` and `missive drafts delete`.
+
+### Changed
+
+- **`Missive::Resources::Posts#create`** — content (`text` / `markdown` / `attachments`) is now optional when at least one conversation-action attribute is present (`close`, `reopen`, `add_assignees`, `add_shared_labels`, `remove_shared_labels`, `add_to_inbox`, `add_to_team_inbox`). Previously, metadata-only posts (which Missive's REST API accepts) were rejected client-side.
+
+### Known gaps (not implemented because Missive's REST API does not expose them)
+
+- `archive`, `snooze`, `mark_read`, `mark_unread`
+- `remove_assignees` (no documented endpoint)
+
 ### Added - Phase 7 Final Enhancements
 - **HTTP Caching Layer** using industry-standard `faraday-http-cache` middleware
   - Automatic ETag and Last-Modified header handling

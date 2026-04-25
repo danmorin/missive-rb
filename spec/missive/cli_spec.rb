@@ -373,4 +373,124 @@ RSpec.describe Missive::CLI do
       cli.send(:client)
     end
   end
+
+  describe "conversations actions" do
+    let(:conversations_resource) { double("Conversations") }
+
+    before do
+      allow(@client_double).to receive(:conversations).and_return(conversations_resource)
+    end
+
+    it "closes a conversation" do
+      expect(conversations_resource).to receive(:close).with(id: "conv-1").and_return(true)
+      expect { described_class.start(["conversations", "close", "conv-1"]) }
+        .to output("closed\n").to_stdout
+    end
+
+    it "closes a conversation with a comment" do
+      expect(conversations_resource).to receive(:close)
+        .with(id: "conv-1", text: "done")
+        .and_return(true)
+      expect { described_class.start(["conversations", "close", "conv-1", "--text", "done"]) }
+        .to output("closed\n").to_stdout
+    end
+
+    it "reopens a conversation" do
+      expect(conversations_resource).to receive(:reopen).with(id: "conv-1").and_return(true)
+      expect { described_class.start(["conversations", "reopen", "conv-1"]) }
+        .to output("reopened\n").to_stdout
+    end
+
+    it "adds labels" do
+      expect(conversations_resource).to receive(:add_labels)
+        .with(id: "conv-1", labels: ["lbl-1", "lbl-2"])
+        .and_return(true)
+      expect { described_class.start(["conversations", "add-labels", "conv-1", "--labels", "lbl-1", "lbl-2"]) }
+        .to output("added\n").to_stdout
+    end
+
+    it "removes labels" do
+      expect(conversations_resource).to receive(:remove_labels)
+        .with(id: "conv-1", labels: ["lbl-1"])
+        .and_return(true)
+      expect { described_class.start(["conversations", "remove-labels", "conv-1", "--labels", "lbl-1"]) }
+        .to output("removed\n").to_stdout
+    end
+
+    it "assigns users" do
+      expect(conversations_resource).to receive(:assign)
+        .with(id: "conv-1", users: ["u-1"], organization: "org-1")
+        .and_return(true)
+      expect do
+        described_class.start([
+                                "conversations", "assign", "conv-1",
+                                "--users", "u-1",
+                                "--organization", "org-1"
+                              ])
+      end.to output("assigned\n").to_stdout
+    end
+
+    it "moves to inbox" do
+      expect(conversations_resource).to receive(:add_to_inbox).with(id: "conv-1").and_return(true)
+      expect { described_class.start(["conversations", "inbox", "conv-1"]) }
+        .to output("moved to inbox\n").to_stdout
+    end
+
+    it "moves to team inbox" do
+      expect(conversations_resource).to receive(:add_to_team_inbox)
+        .with(id: "conv-1", team: "team-1")
+        .and_return(true)
+      expect { described_class.start(["conversations", "team-inbox", "conv-1", "--team", "team-1"]) }
+        .to output("moved to team inbox\n").to_stdout
+    end
+
+    it "merges conversations" do
+      merged = double("Merged", id: "dst-1")
+      expect(conversations_resource).to receive(:merge)
+        .with(id: "src-1", target: "dst-1", subject: nil)
+        .and_return(merged)
+      expect { described_class.start(["conversations", "merge", "src-1", "--target", "dst-1"]) }
+        .to output("dst-1\n").to_stdout
+    end
+
+    it "merges conversations with subject" do
+      merged = double("Merged", id: "dst-1")
+      expect(conversations_resource).to receive(:merge)
+        .with(id: "src-1", target: "dst-1", subject: "Combined")
+        .and_return(merged)
+      expect do
+        described_class.start([
+                                "conversations", "merge", "src-1",
+                                "--target", "dst-1",
+                                "--subject", "Combined"
+                              ])
+      end.to output("dst-1\n").to_stdout
+    end
+
+    it "handles API errors gracefully" do
+      allow(conversations_resource).to receive(:close).and_raise(StandardError, "boom")
+      expect { described_class.start(["conversations", "close", "conv-1"]) }
+        .to output("Error: boom\n").to_stdout.and raise_error(SystemExit)
+    end
+  end
+
+  describe "drafts delete" do
+    let(:drafts_resource) { double("Drafts") }
+
+    before do
+      allow(@client_double).to receive(:drafts).and_return(drafts_resource)
+    end
+
+    it "deletes a draft" do
+      expect(drafts_resource).to receive(:delete).with(id: "draft-1").and_return(true)
+      expect { described_class.start(["drafts", "delete", "draft-1"]) }
+        .to output("deleted\n").to_stdout
+    end
+
+    it "handles API errors gracefully" do
+      allow(drafts_resource).to receive(:delete).and_raise(StandardError, "Not found")
+      expect { described_class.start(["drafts", "delete", "draft-1"]) }
+        .to output("Error: Not found\n").to_stdout.and raise_error(SystemExit)
+    end
+  end
 end

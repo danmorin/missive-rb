@@ -442,4 +442,194 @@ RSpec.describe Missive::Resources::Conversations do
       end.to raise_error(ArgumentError, "limit cannot exceed 10")
     end
   end
+
+  # ----------------------------------------------------------------------
+  # Conversation actions — close, reopen, label, assign, inbox, merge
+  # ----------------------------------------------------------------------
+
+  let(:posts_resource) { instance_double("Missive::Resources::Posts") }
+  let(:post_response) { Missive::Object.new({ "id" => "post-999" }, client) }
+
+  describe "#close" do
+    before { allow(client).to receive(:posts).and_return(posts_resource) }
+
+    it "calls posts.create with conversation + close: true" do
+      expect(posts_resource).to receive(:create)
+        .with(conversation: "conv-123", close: true)
+        .and_return(post_response)
+
+      result = resource.close(id: "conv-123")
+      expect(result).to eq(post_response)
+    end
+
+    it "passes through optional attrs" do
+      expect(posts_resource).to receive(:create)
+        .with(conversation: "conv-123", close: true, text: "Resolved.")
+        .and_return(post_response)
+
+      resource.close(id: "conv-123", text: "Resolved.")
+    end
+
+    it "raises ArgumentError when id is missing" do
+      expect { resource.close(id: nil) }.to raise_error(ArgumentError, "id is required")
+      expect { resource.close(id: "") }.to raise_error(ArgumentError, "id is required")
+    end
+  end
+
+  describe "#reopen" do
+    before { allow(client).to receive(:posts).and_return(posts_resource) }
+
+    it "calls posts.create with conversation + reopen: true" do
+      expect(posts_resource).to receive(:create)
+        .with(conversation: "conv-123", reopen: true)
+        .and_return(post_response)
+
+      resource.reopen(id: "conv-123")
+    end
+
+    it "raises ArgumentError when id is missing" do
+      expect { resource.reopen(id: nil) }.to raise_error(ArgumentError, "id is required")
+    end
+  end
+
+  describe "#add_labels" do
+    before { allow(client).to receive(:posts).and_return(posts_resource) }
+
+    it "calls posts.create with add_shared_labels" do
+      expect(posts_resource).to receive(:create)
+        .with(conversation: "conv-123", add_shared_labels: ["lbl-1", "lbl-2"])
+        .and_return(post_response)
+
+      resource.add_labels(id: "conv-123", labels: ["lbl-1", "lbl-2"])
+    end
+
+    it "raises when labels is not an array" do
+      expect { resource.add_labels(id: "conv-123", labels: "lbl-1") }
+        .to raise_error(ArgumentError, "labels must be an array")
+    end
+
+    it "raises when labels is empty" do
+      expect { resource.add_labels(id: "conv-123", labels: []) }
+        .to raise_error(ArgumentError, "labels cannot be empty")
+    end
+
+    it "raises when any label entry is blank" do
+      expect { resource.add_labels(id: "conv-123", labels: ["lbl-1", ""]) }
+        .to raise_error(ArgumentError, "labels entries must be non-blank strings")
+    end
+
+    it "raises when id is missing" do
+      expect { resource.add_labels(id: nil, labels: ["lbl-1"]) }
+        .to raise_error(ArgumentError, "id is required")
+    end
+  end
+
+  describe "#remove_labels" do
+    before { allow(client).to receive(:posts).and_return(posts_resource) }
+
+    it "calls posts.create with remove_shared_labels" do
+      expect(posts_resource).to receive(:create)
+        .with(conversation: "conv-123", remove_shared_labels: ["lbl-1"])
+        .and_return(post_response)
+
+      resource.remove_labels(id: "conv-123", labels: ["lbl-1"])
+    end
+
+    it "raises when labels is empty" do
+      expect { resource.remove_labels(id: "conv-123", labels: []) }
+        .to raise_error(ArgumentError, "labels cannot be empty")
+    end
+  end
+
+  describe "#assign" do
+    before { allow(client).to receive(:posts).and_return(posts_resource) }
+
+    it "calls posts.create with add_assignees + organization" do
+      expect(posts_resource).to receive(:create)
+        .with(conversation: "conv-123", add_assignees: ["user-1"], organization: "org-1")
+        .and_return(post_response)
+
+      resource.assign(id: "conv-123", users: ["user-1"], organization: "org-1")
+    end
+
+    it "raises when users is empty" do
+      expect { resource.assign(id: "conv-123", users: [], organization: "org-1") }
+        .to raise_error(ArgumentError, "users cannot be empty")
+    end
+
+    it "raises when organization is missing" do
+      expect { resource.assign(id: "conv-123", users: ["user-1"], organization: nil) }
+        .to raise_error(ArgumentError, "organization is required")
+    end
+  end
+
+  describe "#add_to_inbox" do
+    before { allow(client).to receive(:posts).and_return(posts_resource) }
+
+    it "calls posts.create with add_to_inbox: true" do
+      expect(posts_resource).to receive(:create)
+        .with(conversation: "conv-123", add_to_inbox: true)
+        .and_return(post_response)
+
+      resource.add_to_inbox(id: "conv-123")
+    end
+  end
+
+  describe "#add_to_team_inbox" do
+    before { allow(client).to receive(:posts).and_return(posts_resource) }
+
+    it "calls posts.create with add_to_team_inbox + team" do
+      expect(posts_resource).to receive(:create)
+        .with(conversation: "conv-123", add_to_team_inbox: true, team: "team-1")
+        .and_return(post_response)
+
+      resource.add_to_team_inbox(id: "conv-123", team: "team-1")
+    end
+
+    it "raises when team is missing" do
+      expect { resource.add_to_team_inbox(id: "conv-123", team: nil) }
+        .to raise_error(ArgumentError, "team is required")
+    end
+  end
+
+  describe "#merge" do
+    let(:merge_response) do
+      { conversations: [{ "id" => "dst-456", "subject" => "Merged" }] }
+    end
+
+    it "POSTs to /conversations/:id/merge with target body" do
+      expect(connection).to receive(:request)
+        .with(:post, "/conversations/src-123/merge", body: { target: "dst-456" })
+        .and_return(merge_response)
+
+      result = resource.merge(id: "src-123", target: "dst-456")
+      expect(result).to be_a(Missive::Object)
+      expect(result.id).to eq("dst-456")
+    end
+
+    it "includes subject when provided" do
+      expect(connection).to receive(:request)
+        .with(:post, "/conversations/src-123/merge", body: { target: "dst-456", subject: "Combined" })
+        .and_return(merge_response)
+
+      resource.merge(id: "src-123", target: "dst-456", subject: "Combined")
+    end
+
+    it "raises when id and target are identical" do
+      expect { resource.merge(id: "same-id", target: "same-id") }
+        .to raise_error(ArgumentError, "id and target must differ")
+    end
+
+    it "raises when target is missing" do
+      expect { resource.merge(id: "src-123", target: nil) }
+        .to raise_error(ArgumentError, "target is required")
+    end
+
+    it "raises when response has no conversations" do
+      allow(connection).to receive(:request).and_return({ conversations: [] })
+
+      expect { resource.merge(id: "src-123", target: "dst-456") }
+        .to raise_error(Missive::ServerError, "Merge failed")
+    end
+  end
 end

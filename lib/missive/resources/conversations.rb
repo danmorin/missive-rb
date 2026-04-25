@@ -22,6 +22,7 @@ module Missive
       GET = "/conversations/%<id>s"
       MESSAGES = "/conversations/%<id>s/messages"
       COMMENTS = "/conversations/%<id>s/comments"
+      MERGE = "/conversations/%<id>s/merge"
 
       attr_reader :client
 
@@ -222,6 +223,169 @@ module Missive
         end
       end
 
+      # Close a conversation
+      #
+      # Marks the conversation as closed (removed from inbox). Reversible
+      # via {#reopen}. Implemented via POST /posts since Missive's REST
+      # API exposes conversation state mutations through posts rather
+      # than a dedicated PATCH endpoint.
+      #
+      # @param id [String] The conversation ID
+      # @param opts [Hash] Optional pass-through attrs (e.g. :text to attach
+      #   a closing comment, :notification, :organization)
+      # @return [Missive::Object] The created post
+      # @raise [ArgumentError] When id is missing
+      # @example Close a conversation
+      #   client.conversations.close(id: "conv-123")
+      # @example Close with a closing comment
+      #   client.conversations.close(id: "conv-123", text: "Resolved.")
+      def close(id:, **opts)
+        validate_id!(id)
+        client.posts.create(conversation: id, close: true, **opts)
+      end
+
+      # Reopen a closed conversation
+      #
+      # Returns the conversation to the inbox.
+      #
+      # @param id [String] The conversation ID
+      # @param opts [Hash] Optional pass-through attrs
+      # @return [Missive::Object] The created post
+      # @raise [ArgumentError] When id is missing
+      # @example
+      #   client.conversations.reopen(id: "conv-123")
+      def reopen(id:, **opts)
+        validate_id!(id)
+        client.posts.create(conversation: id, reopen: true, **opts)
+      end
+
+      # Add shared labels to a conversation
+      #
+      # @param id [String] The conversation ID
+      # @param labels [Array<String>] Non-empty array of shared label IDs
+      # @param opts [Hash] Optional pass-through attrs
+      # @return [Missive::Object] The created post
+      # @raise [ArgumentError] When id or labels are missing/empty
+      # @example
+      #   client.conversations.add_labels(id: "conv-123", labels: ["lbl-1", "lbl-2"])
+      def add_labels(id:, labels:, **opts)
+        validate_id!(id)
+        validate_id_array!(labels, name: "labels")
+        client.posts.create(conversation: id, add_shared_labels: labels, **opts)
+      end
+
+      # Remove shared labels from a conversation
+      #
+      # @param id [String] The conversation ID
+      # @param labels [Array<String>] Non-empty array of shared label IDs
+      # @param opts [Hash] Optional pass-through attrs
+      # @return [Missive::Object] The created post
+      # @raise [ArgumentError] When id or labels are missing/empty
+      # @example
+      #   client.conversations.remove_labels(id: "conv-123", labels: ["lbl-1"])
+      def remove_labels(id:, labels:, **opts)
+        validate_id!(id)
+        validate_id_array!(labels, name: "labels")
+        client.posts.create(conversation: id, remove_shared_labels: labels, **opts)
+      end
+
+      # Assign users to a conversation
+      #
+      # Adds the given users as assignees. Existing assignees are preserved.
+      # Missive requires `organization` whenever assignees are added.
+      #
+      # @param id [String] The conversation ID
+      # @param users [Array<String>] Non-empty array of user IDs
+      # @param organization [String] Organization ID (required by API)
+      # @param opts [Hash] Optional pass-through attrs
+      # @return [Missive::Object] The created post
+      # @raise [ArgumentError] When required args are missing/empty
+      # @example
+      #   client.conversations.assign(
+      #     id: "conv-123",
+      #     users: ["user-1"],
+      #     organization: "org-1"
+      #   )
+      def assign(id:, users:, organization:, **opts)
+        validate_id!(id)
+        validate_id_array!(users, name: "users")
+        validate_present!(organization, name: "organization")
+        client.posts.create(
+          conversation: id,
+          add_assignees: users,
+          organization: organization,
+          **opts
+        )
+      end
+
+      # Move a conversation to the inbox
+      #
+      # @param id [String] The conversation ID
+      # @param opts [Hash] Optional pass-through attrs
+      # @return [Missive::Object] The created post
+      # @raise [ArgumentError] When id is missing
+      # @example
+      #   client.conversations.add_to_inbox(id: "conv-123")
+      def add_to_inbox(id:, **opts)
+        validate_id!(id)
+        client.posts.create(conversation: id, add_to_inbox: true, **opts)
+      end
+
+      # Move a conversation to a team inbox
+      #
+      # @param id [String] The conversation ID
+      # @param team [String] Team ID (required by API)
+      # @param opts [Hash] Optional pass-through attrs
+      # @return [Missive::Object] The created post
+      # @raise [ArgumentError] When required args are missing/empty
+      # @example
+      #   client.conversations.add_to_team_inbox(id: "conv-123", team: "team-1")
+      def add_to_team_inbox(id:, team:, **opts)
+        validate_id!(id)
+        validate_present!(team, name: "team")
+        client.posts.create(
+          conversation: id,
+          add_to_team_inbox: true,
+          team: team,
+          **opts
+        )
+      end
+
+      # Merge a conversation into another
+      #
+      # The conversation identified by `id` is merged into `target`. Per
+      # Missive's API: "the returned conversation `id` can differ from
+      # `target`" — Missive may swap source/target to preserve the
+      # higher-traffic conversation.
+      #
+      # @param id [String] The source conversation ID (path param)
+      # @param target [String] The destination conversation ID (body param)
+      # @param subject [String, nil] Optional new subject for the merged conversation
+      # @return [Missive::Object] The resulting (merged) conversation
+      # @raise [ArgumentError] When id/target are missing or identical
+      # @example
+      #   client.conversations.merge(id: "src-123", target: "dst-456")
+      # @example With a new subject
+      #   client.conversations.merge(id: "src-123", target: "dst-456", subject: "Combined thread")
+      def merge(id:, target:, subject: nil)
+        validate_id!(id)
+        validate_present!(target, name: "target")
+        raise ArgumentError, "id and target must differ" if id == target
+
+        path = format(MERGE, id: id)
+        body = { target: target }
+        body[:subject] = subject if subject
+
+        ActiveSupport::Notifications.instrument("missive.conversations.merge", id: id, target: target) do
+          response = client.connection.request(:post, path, body: body)
+          convs = response[:conversations] || response["conversations"]
+          raise Missive::ServerError, "Merge failed" if convs.nil? || (convs.respond_to?(:empty?) && convs.empty?)
+
+          conv_data = convs.is_a?(Array) ? convs.first : convs
+          Missive::Object.new(conv_data, client)
+        end
+      end
+
       private
 
       # Validate param combinations for list method
@@ -231,6 +395,25 @@ module Missive
         # The actual validation would depend on the specific restrictions
         # mentioned in the API documentation
         true
+      end
+
+      def validate_id!(id)
+        validate_present!(id, name: "id")
+      end
+
+      def validate_present!(value, name:)
+        return unless value.nil? || value.to_s.strip.empty?
+
+        raise ArgumentError, "#{name} is required"
+      end
+
+      def validate_id_array!(arr, name:)
+        raise ArgumentError, "#{name} must be an array" unless arr.is_a?(Array)
+        raise ArgumentError, "#{name} cannot be empty" if arr.empty?
+
+        arr.each do |entry|
+          raise ArgumentError, "#{name} entries must be non-blank strings" if entry.nil? || entry.to_s.strip.empty?
+        end
       end
     end
   end

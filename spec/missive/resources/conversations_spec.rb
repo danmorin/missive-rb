@@ -449,25 +449,42 @@ RSpec.describe Missive::Resources::Conversations do
 
   let(:posts_resource) { instance_double("Missive::Resources::Posts") }
   let(:post_response) { Missive::Object.new({ "id" => "post-999" }, client) }
+  let(:default_notification) { { title: kind_of(String), body: "via Missive API" } }
 
   describe "#close" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with conversation + close: true" do
-      expect(posts_resource).to receive(:create)
-        .with(conversation: "conv-123", close: true)
-        .and_return(post_response)
+    it "calls posts.create with conversation + close: true + default notification" do
+      expect(posts_resource).to receive(:create) do |**args|
+        expect(args[:conversation]).to eq("conv-123")
+        expect(args[:close]).to eq(true)
+        expect(args[:notification]).to eq(title: "Conversation closed", body: "via Missive API")
+        post_response
+      end
 
       result = resource.close(id: "conv-123")
       expect(result).to eq(post_response)
     end
 
-    it "passes through optional attrs" do
-      expect(posts_resource).to receive(:create)
-        .with(conversation: "conv-123", close: true, text: "Resolved.")
-        .and_return(post_response)
+    it "passes through optional attrs alongside the default notification" do
+      expect(posts_resource).to receive(:create) do |**args|
+        expect(args[:close]).to eq(true)
+        expect(args[:text]).to eq("Resolved.")
+        expect(args[:notification][:title]).to eq("Conversation closed")
+        post_response
+      end
 
       resource.close(id: "conv-123", text: "Resolved.")
+    end
+
+    it "lets callers override the default notification" do
+      custom = { title: "Custom", body: "Custom body" }
+      expect(posts_resource).to receive(:create) do |**args|
+        expect(args[:notification]).to eq(custom)
+        post_response
+      end
+
+      resource.close(id: "conv-123", notification: custom)
     end
 
     it "raises ArgumentError when id is missing" do
@@ -479,10 +496,12 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#reopen" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with conversation + reopen: true" do
-      expect(posts_resource).to receive(:create)
-        .with(conversation: "conv-123", reopen: true)
-        .and_return(post_response)
+    it "calls posts.create with reopen: true + default notification" do
+      expect(posts_resource).to receive(:create) do |**args|
+        expect(args[:reopen]).to eq(true)
+        expect(args[:notification]).to eq(title: "Conversation reopened", body: "via Missive API")
+        post_response
+      end
 
       resource.reopen(id: "conv-123")
     end
@@ -495,10 +514,12 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#add_labels" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with add_shared_labels" do
-      expect(posts_resource).to receive(:create)
-        .with(conversation: "conv-123", add_shared_labels: ["lbl-1", "lbl-2"])
-        .and_return(post_response)
+    it "calls posts.create with add_shared_labels + default notification" do
+      expect(posts_resource).to receive(:create) do |**args|
+        expect(args[:add_shared_labels]).to eq(["lbl-1", "lbl-2"])
+        expect(args[:notification]).to eq(title: "Labels added", body: "via Missive API")
+        post_response
+      end
 
       resource.add_labels(id: "conv-123", labels: ["lbl-1", "lbl-2"])
     end
@@ -527,10 +548,12 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#remove_labels" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with remove_shared_labels" do
-      expect(posts_resource).to receive(:create)
-        .with(conversation: "conv-123", remove_shared_labels: ["lbl-1"])
-        .and_return(post_response)
+    it "calls posts.create with remove_shared_labels + default notification" do
+      expect(posts_resource).to receive(:create) do |**args|
+        expect(args[:remove_shared_labels]).to eq(["lbl-1"])
+        expect(args[:notification]).to eq(title: "Labels removed", body: "via Missive API")
+        post_response
+      end
 
       resource.remove_labels(id: "conv-123", labels: ["lbl-1"])
     end
@@ -544,10 +567,13 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#assign" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with add_assignees + organization" do
-      expect(posts_resource).to receive(:create)
-        .with(conversation: "conv-123", add_assignees: ["user-1"], organization: "org-1")
-        .and_return(post_response)
+    it "calls posts.create with add_assignees + organization + default notification" do
+      expect(posts_resource).to receive(:create) do |**args|
+        expect(args[:add_assignees]).to eq(["user-1"])
+        expect(args[:organization]).to eq("org-1")
+        expect(args[:notification]).to eq(title: "Assignees updated", body: "via Missive API")
+        post_response
+      end
 
       resource.assign(id: "conv-123", users: ["user-1"], organization: "org-1")
     end
@@ -566,10 +592,12 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#add_to_inbox" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with add_to_inbox: true" do
-      expect(posts_resource).to receive(:create)
-        .with(conversation: "conv-123", add_to_inbox: true)
-        .and_return(post_response)
+    it "calls posts.create with add_to_inbox: true + default notification" do
+      expect(posts_resource).to receive(:create) do |**args|
+        expect(args[:add_to_inbox]).to eq(true)
+        expect(args[:notification]).to eq(title: "Moved to inbox", body: "via Missive API")
+        post_response
+      end
 
       resource.add_to_inbox(id: "conv-123")
     end
@@ -578,10 +606,13 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#add_to_team_inbox" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with add_to_team_inbox + team" do
-      expect(posts_resource).to receive(:create)
-        .with(conversation: "conv-123", add_to_team_inbox: true, team: "team-1")
-        .and_return(post_response)
+    it "calls posts.create with add_to_team_inbox + team + default notification" do
+      expect(posts_resource).to receive(:create) do |**args|
+        expect(args[:add_to_team_inbox]).to eq(true)
+        expect(args[:team]).to eq("team-1")
+        expect(args[:notification]).to eq(title: "Moved to team inbox", body: "via Missive API")
+        post_response
+      end
 
       resource.add_to_team_inbox(id: "conv-123", team: "team-1")
     end

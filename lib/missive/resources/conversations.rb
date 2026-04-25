@@ -241,7 +241,7 @@ module Missive
       #   client.conversations.close(id: "conv-123", text: "Resolved.")
       def close(id:, **opts)
         validate_id!(id)
-        client.posts.create(conversation: id, close: true, **opts)
+        post_action(id: id, action: :close, default_title: "Conversation closed", opts: opts)
       end
 
       # Reopen a closed conversation
@@ -256,7 +256,7 @@ module Missive
       #   client.conversations.reopen(id: "conv-123")
       def reopen(id:, **opts)
         validate_id!(id)
-        client.posts.create(conversation: id, reopen: true, **opts)
+        post_action(id: id, action: :reopen, default_title: "Conversation reopened", opts: opts)
       end
 
       # Add shared labels to a conversation
@@ -271,7 +271,13 @@ module Missive
       def add_labels(id:, labels:, **opts)
         validate_id!(id)
         validate_id_array!(labels, name: "labels")
-        client.posts.create(conversation: id, add_shared_labels: labels, **opts)
+        post_action(
+          id: id,
+          action: :add_shared_labels,
+          action_value: labels,
+          default_title: "Labels added",
+          opts: opts
+        )
       end
 
       # Remove shared labels from a conversation
@@ -286,7 +292,13 @@ module Missive
       def remove_labels(id:, labels:, **opts)
         validate_id!(id)
         validate_id_array!(labels, name: "labels")
-        client.posts.create(conversation: id, remove_shared_labels: labels, **opts)
+        post_action(
+          id: id,
+          action: :remove_shared_labels,
+          action_value: labels,
+          default_title: "Labels removed",
+          opts: opts
+        )
       end
 
       # Assign users to a conversation
@@ -310,11 +322,12 @@ module Missive
         validate_id!(id)
         validate_id_array!(users, name: "users")
         validate_present!(organization, name: "organization")
-        client.posts.create(
-          conversation: id,
-          add_assignees: users,
-          organization: organization,
-          **opts
+        post_action(
+          id: id,
+          action: :add_assignees,
+          action_value: users,
+          default_title: "Assignees updated",
+          opts: opts.merge(organization: organization)
         )
       end
 
@@ -328,7 +341,7 @@ module Missive
       #   client.conversations.add_to_inbox(id: "conv-123")
       def add_to_inbox(id:, **opts)
         validate_id!(id)
-        client.posts.create(conversation: id, add_to_inbox: true, **opts)
+        post_action(id: id, action: :add_to_inbox, default_title: "Moved to inbox", opts: opts)
       end
 
       # Move a conversation to a team inbox
@@ -343,11 +356,11 @@ module Missive
       def add_to_team_inbox(id:, team:, **opts)
         validate_id!(id)
         validate_present!(team, name: "team")
-        client.posts.create(
-          conversation: id,
-          add_to_team_inbox: true,
-          team: team,
-          **opts
+        post_action(
+          id: id,
+          action: :add_to_team_inbox,
+          default_title: "Moved to team inbox",
+          opts: opts.merge(team: team)
         )
       end
 
@@ -387,6 +400,29 @@ module Missive
       end
 
       private
+
+      # Default notification body shared across action methods. Missive
+      # requires `notification: {title, body}` on every POST /posts call,
+      # even when the post only carries conversation-action attrs (close,
+      # reopen, label/assignee changes). Callers can override by passing
+      # their own `notification:` in `**opts`.
+      DEFAULT_ACTION_NOTIFICATION_BODY = "via Missive API"
+
+      # Internal: dispatch a single conversation-action POST /posts call
+      # with the right action attr, organization passthrough, and a default
+      # notification when the caller didn't supply one.
+      #
+      # @param id [String] Conversation ID
+      # @param action [Symbol] Action attr key (e.g. :close, :add_shared_labels)
+      # @param action_value [Object] Action attr value (defaults to true for booleans)
+      # @param default_title [String] Default notification title if caller omits one
+      # @param opts [Hash] Caller-supplied additional attrs
+      # @return [Missive::Object] The created post
+      def post_action(id:, action:, default_title:, action_value: true, opts: {})
+        merged = opts.dup
+        merged[:notification] ||= { title: default_title, body: DEFAULT_ACTION_NOTIFICATION_BODY }
+        client.posts.create(conversation: id, action => action_value, **merged)
+      end
 
       # Validate param combinations for list method
       # Fail fast on unsupported param combos per Missive API docs

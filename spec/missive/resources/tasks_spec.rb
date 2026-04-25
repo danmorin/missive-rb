@@ -198,7 +198,7 @@ RSpec.describe Missive::Resources::Tasks do
       it "raises ArgumentError for invalid state" do
         expect do
           subject.create(title: title, team: team_id, state: "invalid")
-        end.to raise_error(ArgumentError, "state must be one of: todo, done")
+        end.to raise_error(ArgumentError, "state must be one of: todo, in_progress, done, closed")
       end
 
       it "raises ArgumentError for standalone task without team or assignees" do
@@ -361,13 +361,13 @@ RSpec.describe Missive::Resources::Tasks do
       it "raises ArgumentError for invalid state" do
         expect do
           subject.update(id: task_id, state: "invalid")
-        end.to raise_error(ArgumentError, "state must be one of: todo, done")
+        end.to raise_error(ArgumentError, "state must be one of: todo, in_progress, done, closed")
       end
 
       it "handles string key state validation" do
         expect do
           subject.update(id: task_id, "state" => "invalid")
-        end.to raise_error(ArgumentError, "state must be one of: todo, done")
+        end.to raise_error(ArgumentError, "state must be one of: todo, in_progress, done, closed")
       end
 
       it "converts string key state to symbol" do

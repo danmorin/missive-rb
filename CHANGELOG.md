@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [0.2.1]
+
+### Fixed
+
+- **`Resources::Conversations` action methods now auto-inject a default `notification`** when the caller doesn't supply one. Missive's `POST /v1/posts` requires `notification: {title, body}` on every call, even when the post only carries conversation-action attrs (`close`, `reopen`, `add_shared_labels`, `remove_shared_labels`, `add_assignees`, `add_to_inbox`, `add_to_team_inbox`). Without this, the v0.2.0 action methods returned 422 from Missive. Caller-supplied `notification:` in `**opts` always wins.
+
+### Changed
+
+- **`Resources::Tasks::VALID_STATES`** — expanded from `%w[todo done]` to `%w[todo in_progress done closed]` to match Missive's documented task state values. `done` is retained as a backward-compatible alias for callers built against earlier gem releases.
+
 ## [0.2.0]
 
 ### Added — Conversation Actions

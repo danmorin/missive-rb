@@ -28,8 +28,15 @@ module Missive
       CREATE = "/tasks"
       UPDATE = "/tasks/%<id>s"
 
-      # Valid task states
-      VALID_STATES = %w[todo done].freeze
+      # Valid task states.
+      #
+      # Missive's REST docs (2026-04-25) document `todo`, `in_progress`,
+      # and `closed` as the canonical task state values. The earlier gem
+      # release accepted `todo` and `done`; we keep `done` as a recognized
+      # alias for backward compatibility with callers built against
+      # missive-rb 0.1.x / 0.2.0 — Missive's API will be the final arbiter
+      # if it has actually deprecated the `done` value.
+      VALID_STATES = %w[todo in_progress done closed].freeze
 
       # Allowed fields for task updates per Missive API
       ALLOWED_UPDATE_FIELDS = %w[

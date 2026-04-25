@@ -256,6 +256,95 @@ module Missive
         exit 1
       end
 
+      desc "close CONVERSATION_ID", "Close a conversation"
+      option :text, type: :string, desc: "Optional closing comment"
+      def close(conversation_id)
+        attrs = options[:text] ? { text: options[:text] } : {}
+        parent.send(:client).conversations.close(id: conversation_id, **attrs)
+        puts "closed"
+      rescue StandardError => e
+        puts "Error: #{e.message}"
+        exit 1
+      end
+
+      desc "reopen CONVERSATION_ID", "Reopen a closed conversation"
+      def reopen(conversation_id)
+        parent.send(:client).conversations.reopen(id: conversation_id)
+        puts "reopened"
+      rescue StandardError => e
+        puts "Error: #{e.message}"
+        exit 1
+      end
+
+      desc "add-labels CONVERSATION_ID", "Add shared labels to a conversation"
+      option :labels, type: :array, required: true, desc: "Shared label IDs"
+      def add_labels(conversation_id)
+        parent.send(:client).conversations.add_labels(id: conversation_id, labels: options[:labels])
+        puts "added"
+      rescue StandardError => e
+        puts "Error: #{e.message}"
+        exit 1
+      end
+
+      desc "remove-labels CONVERSATION_ID", "Remove shared labels from a conversation"
+      option :labels, type: :array, required: true, desc: "Shared label IDs"
+      def remove_labels(conversation_id)
+        parent.send(:client).conversations.remove_labels(id: conversation_id, labels: options[:labels])
+        puts "removed"
+      rescue StandardError => e
+        puts "Error: #{e.message}"
+        exit 1
+      end
+
+      desc "assign CONVERSATION_ID", "Assign users to a conversation"
+      option :users, type: :array, required: true, desc: "User IDs to assign"
+      option :organization, type: :string, required: true, desc: "Organization ID"
+      def assign(conversation_id)
+        parent.send(:client).conversations.assign(
+          id: conversation_id,
+          users: options[:users],
+          organization: options[:organization]
+        )
+        puts "assigned"
+      rescue StandardError => e
+        puts "Error: #{e.message}"
+        exit 1
+      end
+
+      desc "inbox CONVERSATION_ID", "Move a conversation to the inbox"
+      def inbox(conversation_id)
+        parent.send(:client).conversations.add_to_inbox(id: conversation_id)
+        puts "moved to inbox"
+      rescue StandardError => e
+        puts "Error: #{e.message}"
+        exit 1
+      end
+
+      desc "team-inbox CONVERSATION_ID", "Move a conversation to a team inbox"
+      option :team, type: :string, required: true, desc: "Team ID"
+      def team_inbox(conversation_id)
+        parent.send(:client).conversations.add_to_team_inbox(id: conversation_id, team: options[:team])
+        puts "moved to team inbox"
+      rescue StandardError => e
+        puts "Error: #{e.message}"
+        exit 1
+      end
+
+      desc "merge SOURCE_ID", "Merge SOURCE_ID into --target"
+      option :target, type: :string, required: true, desc: "Destination conversation ID"
+      option :subject, type: :string, desc: "Optional new subject"
+      def merge(source_id)
+        merged = parent.send(:client).conversations.merge(
+          id: source_id,
+          target: options[:target],
+          subject: options[:subject]
+        )
+        puts merged.id
+      rescue StandardError => e
+        puts "Error: #{e.message}"
+        exit 1
+      end
+
       private
 
       def collect_messages(conversation_id)
@@ -273,6 +362,24 @@ module Missive
         end
         comments
       end
+
+      def parent
+        @parent ||= CLI.new
+      end
+    end
+
+    # Drafts subcommand
+    class Drafts < Thor
+      desc "delete DRAFT_ID", "Delete a draft"
+      def delete(draft_id)
+        parent.send(:client).drafts.delete(id: draft_id)
+        puts "deleted"
+      rescue StandardError => e
+        puts "Error: #{e.message}"
+        exit 1
+      end
+
+      private
 
       def parent
         @parent ||= CLI.new
@@ -380,6 +487,9 @@ module Missive
 
     desc "conversations SUBCOMMAND", "Manage conversations"
     subcommand "conversations", Conversations
+
+    desc "drafts SUBCOMMAND", "Manage drafts"
+    subcommand "drafts", Drafts
 
     desc "analytics SUBCOMMAND", "Manage analytics"
     subcommand "analytics", Analytics

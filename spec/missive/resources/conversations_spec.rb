@@ -443,6 +443,84 @@ RSpec.describe Missive::Resources::Conversations do
     end
   end
 
+  describe "#posts" do
+    let(:posts_response) do
+      {
+        posts: [
+          { id: "post-1", text: "Conversation closed via API", created_at: 1_563_806_400 },
+          { id: "post-2", text: "Labels added via API",        created_at: 1_563_806_300 }
+        ]
+      }
+    end
+
+    before do
+      allow(connection).to receive(:request).and_return(posts_response)
+    end
+
+    it "sends GET to /conversations/:id/posts with default limit 10" do
+      resource.posts(conversation_id: "conv-123")
+
+      expect(connection).to have_received(:request).with(
+        :get,
+        "/conversations/conv-123/posts",
+        params: { limit: 10 }
+      )
+    end
+
+    it "sends GET with custom limit" do
+      resource.posts(conversation_id: "conv-123", limit: 5)
+
+      expect(connection).to have_received(:request).with(
+        :get,
+        "/conversations/conv-123/posts",
+        params: { limit: 5 }
+      )
+    end
+
+    it "sends GET with until cursor" do
+      resource.posts(conversation_id: "conv-123", until_cursor: "tok-1")
+
+      expect(connection).to have_received(:request).with(
+        :get,
+        "/conversations/conv-123/posts",
+        params: { limit: 10, until: "tok-1" }
+      )
+    end
+
+    it "raises ArgumentError when limit exceeds 10" do
+      expect { resource.posts(conversation_id: "conv-123", limit: 11) }
+        .to raise_error(ArgumentError, "limit cannot exceed 10")
+    end
+
+    it "returns array of Missive::Object instances" do
+      result = resource.posts(conversation_id: "conv-123")
+
+      expect(result).to be_an(Array)
+      expect(result.size).to eq(2)
+      expect(result).to all(be_a(Missive::Object))
+      expect(result.first.id).to eq("post-1")
+    end
+
+    it "handles missing posts key in response" do
+      allow(connection).to receive(:request).and_return({})
+      expect(resource.posts(conversation_id: "conv-123")).to eq([])
+    end
+
+    it "emits instrumentation event" do
+      notifications = []
+      ActiveSupport::Notifications.subscribe("missive.conversations.posts") do |*args|
+        notifications << ActiveSupport::Notifications::Event.new(*args).payload
+      end
+
+      resource.posts(conversation_id: "conv-123")
+
+      expect(notifications).not_to be_empty
+      expect(notifications.first).to include(conversation_id: "conv-123")
+    ensure
+      ActiveSupport::Notifications.unsubscribe("missive.conversations.posts")
+    end
+  end
+
   # ----------------------------------------------------------------------
   # Conversation actions — close, reopen, label, assign, inbox, merge
   # ----------------------------------------------------------------------

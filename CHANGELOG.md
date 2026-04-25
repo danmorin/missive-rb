@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [0.2.3]
+
+### Added
+
+- **`Resources::Conversations#posts(conversation_id:, limit:, until_cursor:)`** — fetch a single page of posts (integration-driven entries: action posts from `close`/`reopen`/`add_labels`/`assign`/etc., plus notes from automations and webhooks). Mirrors the cap and pagination semantics of `#messages` and `#comments` (max 10/page, `until_cursor` based pagination).
+- **`Resources::Conversations#each_post(conversation_id:, limit:)`** — pagination helper that yields each post across all pages.
+
+These complement `#comments` (inline user-typed comments on messages) which is a different Missive resource. Use `#posts` to read what `client.posts.create(conversation: ...)` writes; use `#comments` to read what users type inline in the Missive UI.
+
 ## [0.2.2]
 
 ### Fixed

@@ -22,6 +22,7 @@ module Missive
       GET = "/conversations/%<id>s"
       MESSAGES = "/conversations/%<id>s/messages"
       COMMENTS = "/conversations/%<id>s/comments"
+      POSTS = "/conversations/%<id>s/posts"
       MERGE = "/conversations/%<id>s/merge"
 
       attr_reader :client
@@ -219,6 +220,63 @@ module Missive
           data_key: :comments
         ) do |item|
           # Convert each item to a Missive::Object
+          yield Missive::Object.new(item, client)
+        end
+      end
+
+      # Get posts for a specific conversation
+      #
+      # Posts are integration-driven entries on a conversation — created via
+      # `POST /v1/posts` (e.g. action posts from {#close}, {#reopen},
+      # {#add_labels}, {#assign}; or notes from automation/webhooks). Distinct
+      # from {#comments}, which are inline user-typed comments on messages.
+      #
+      # @param conversation_id [String] The conversation ID
+      # @param limit [Integer] Number of posts per page (max: 10)
+      # @param until_cursor [String] Pagination cursor for fetching older posts
+      # @return [Array<Missive::Object>] Array of post objects for the current page
+      # @raise [ArgumentError] When limit exceeds 10
+      # @example Get posts on a conversation
+      #   posts = client.conversations.posts(conversation_id: "conv-123")
+      def posts(conversation_id:, limit: 10, until_cursor: nil)
+        # Mirror the gem's documented messages/comments cap (10/page).
+        raise ArgumentError, "limit cannot exceed 10" if limit > 10
+
+        path = format(POSTS, id: conversation_id)
+        params = { limit: limit }
+        params[:until] = until_cursor if until_cursor
+
+        ActiveSupport::Notifications.instrument("missive.conversations.posts", conversation_id: conversation_id,
+                                                                                params: params) do
+          response = client.connection.request(:get, path, params: params)
+
+          (response[:posts] || []).map { |post| Missive::Object.new(post, client) }
+        end
+      end
+
+      # Iterate through all posts for a conversation with automatic pagination
+      #
+      # @param conversation_id [String] The conversation ID
+      # @param limit [Integer] Number of posts per page (max: 10)
+      # @yield [Missive::Object] Each post object
+      # @return [Enumerator] If no block given
+      # @raise [ArgumentError] When limit exceeds 10
+      # @example Iterate through all posts
+      #   client.conversations.each_post(conversation_id: "conv-123") do |post|
+      #     puts post.text
+      #   end
+      def each_post(conversation_id:, limit: 10, **params)
+        raise ArgumentError, "limit cannot exceed 10" if limit > 10
+
+        path = format(POSTS, id: conversation_id)
+        merged_params = { limit: limit }.merge(params)
+
+        Missive::Paginator.each_item(
+          path: path,
+          client: client,
+          params: merged_params,
+          data_key: :posts
+        ) do |item|
           yield Missive::Object.new(item, client)
         end
       end

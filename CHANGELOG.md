@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [0.2.5]
+
+### Fixed (breaking — Responses CRUD)
+
+Live testing surfaced two contract mismatches in the v0.2.4 Responses CRUD release:
+
+- **`Resources::Responses#create(title:, body:, **attrs)`** — `name:` keyword renamed to `title:`. Missive's API uses `title` as the response template's display name; the v0.2.4 release sent `name` and the field was silently dropped. Callers built against v0.2.4 must rename the kwarg.
+- **`Resources::Responses#update(id:, **attrs)`** — request body shape changed. Was: `{responses: {<attrs>}}`. Now: `{responses: [{id: <id>, <attrs>}]}`. Missive's PATCH endpoint requires the body to be an array AND each object to carry its own `id`, even for single-item updates. The previous shape returned `"Invalid resource ID(s)"` in production.
+- **`UPDATE` path constant** changed from `/responses/%<id>s` to `/responses/%<ids>s` to reflect that the path supports a comma-list batch (single ID still works).
+
+### Notes
+
+Documented Missive field names that may surprise callers: `share_with_team` (no `d`), `shared_labels` (plural array), `subject`, `to_fields`, `cc_fields`, `bcc_fields`, `attachments`, `external_id`, `external_source`, `user`. The gem passes attrs through verbatim — using `shared_with_team` (with `d`) or `shared_label` (singular) silently no-ops.
+
 ## [0.2.4]
 
 ### Added

@@ -8,7 +8,7 @@ module Missive
       LIST = "/responses"
       GET = "/responses/%<id>s"
       CREATE = "/responses"
-      UPDATE = "/responses/%<id>s"
+      UPDATE = "/responses/%<ids>s"
       DELETE = "/responses/%<id>s"
 
       # @param client [Missive::Client] The API client instance
@@ -77,23 +77,27 @@ module Missive
 
       # Create a response template
       #
-      # @param name [String] Response template name (required)
-      # @param body [String] HTML or text body for the response (required)
-      # @param attrs [Hash] Additional attributes (e.g. :organization, :shared,
-      #   :shared_with_team, :shared_label)
+      # Missive's API uses `title` (NOT `name`) for the response template's
+      # display name. Other documented fields: subject, organization, user,
+      # share_with_team (no `d`), shared_labels (plural array), to_fields,
+      # cc_fields, bcc_fields, external_id, external_source, attachments.
+      #
+      # @param title [String] Response template name (required by Missive)
+      # @param body [String] HTML or text body (required)
+      # @param attrs [Hash] Additional attributes
       # @return [Missive::Object] The created response
-      # @raise [ArgumentError] If name or body are missing/blank
+      # @raise [ArgumentError] If title or body are missing/blank
       # @example
       #   client.responses.create(
-      #     name: "Hello",
+      #     title: "Hello",
       #     body: "<p>Thanks for reaching out!</p>",
       #     organization: "org-1"
       #   )
-      def create(name:, body:, **attrs)
-        raise ArgumentError, "name cannot be blank" if name.nil? || name.to_s.strip.empty?
+      def create(title:, body:, **attrs)
+        raise ArgumentError, "title cannot be blank" if title.nil? || title.to_s.strip.empty?
         raise ArgumentError, "body cannot be blank" if body.nil? || body.to_s.strip.empty?
 
-        payload = { responses: { name: name, body: body }.merge(attrs) }
+        payload = { responses: { title: title, body: body }.merge(attrs) }
 
         ActiveSupport::Notifications.instrument("missive.responses.create", payload: payload) do
           response = @client.connection.request(:post, CREATE, body: payload)
@@ -108,9 +112,21 @@ module Missive
 
       # Update a response template
       #
+      # Missive's PATCH /v1/responses/:id endpoint expects:
+      #   - URL path:  PATCH /v1/responses/:id           (single ID is OK)
+      #                or  /v1/responses/:id1,:id2,...   (batch — same path, comma-list)
+      #   - Body:      { responses: [{ id: ..., title: ..., ... }] }
+      #                NOTE: each object in the array MUST contain `id`, even
+      #                for a single-item update. Otherwise Missive returns
+      #                "Invalid resource ID(s)".
+      #
+      # The gem's signature is single-item ergonomic: pass `id:` plus the
+      # fields to update; the gem handles the array wrapping internally.
+      #
       # @param id [String] Response ID (required)
-      # @param attrs [Hash] Attributes to update (e.g. :name, :body,
-      #   :organization, :shared, :shared_with_team, :shared_label)
+      # @param attrs [Hash] Fields to update (title, body, subject,
+      #   organization, user, share_with_team, shared_labels, to_fields,
+      #   cc_fields, bcc_fields, external_id, external_source, attachments)
       # @return [Missive::Object] The updated response
       # @raise [ArgumentError] If id is missing or no attributes provided
       # @example
@@ -119,8 +135,11 @@ module Missive
         raise ArgumentError, "id cannot be blank" if id.nil? || id.to_s.strip.empty?
         raise ArgumentError, "no attributes provided for update" if attrs.empty?
 
-        path = format(UPDATE, id: id)
-        payload = { responses: attrs }
+        path = format(UPDATE, ids: id)
+        # Missive REQUIRES each response object to include its own id, even
+        # when only one is being patched. The id-in-body gets matched against
+        # the id-in-path for verification.
+        payload = { responses: [attrs.merge(id: id)] }
 
         ActiveSupport::Notifications.instrument("missive.responses.update", id: id, payload: payload) do
           response = @client.connection.request(:patch, path, body: payload)

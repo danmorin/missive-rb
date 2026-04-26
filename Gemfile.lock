@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    missive-rb (0.2.5)
+    missive-rb (0.2.7)
       activesupport (>= 7.0)
       concurrent-ruby (~> 1.2)
       faraday (~> 2.0)

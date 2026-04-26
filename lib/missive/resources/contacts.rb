@@ -5,12 +5,19 @@ module Missive
     # Handles all contact-related API operations
     #
     # @example Creating a contact
+    #   # Missive's contacts API uses a nested `infos:` array for
+    #   # email/phone/social handles. Top-level fields are limited to
+    #   # `first_name`, `last_name`, `contact_book` (and `id` on update).
     #   contact = client.contacts.create(
     #     contacts: {
-    #       email: "john@example.com",
+    #       contact_book: "book-id",
     #       first_name: "John",
     #       last_name: "Doe",
-    #       contact_book: "book-id"
+    #       infos: [
+    #         { kind: "email",        value: "john@example.com", label: "personal" },
+    #         { kind: "phone_number", value: "+15555550100",     label: "mobile"   },
+    #         { kind: "twitter",      value: "johndoe",          label: "personal" }
+    #       ]
     #     }
     #   )
     #
@@ -18,7 +25,7 @@ module Missive
     #   updated = client.contacts.update(
     #     contact_hashes: [
     #       { id: "contact-1", first_name: "Jane" },
-    #       { id: "contact-2", last_name: "Smith" }
+    #       { id: "contact-2", infos: [{ kind: "email", value: "new@x.com", label: "work" }] }
     #     ]
     #   )
     #
@@ -38,12 +45,26 @@ module Missive
       LIST = "/contacts"
       GET = "/contacts/%<id>s"
 
-      # Allowed fields for contact updates per Missive API
+      # Allowed fields for contact updates per Missive API.
+      #
+      # Verified against Missive's REST contract on 2026-04-25: only the
+      # following fields are persisted at the top level. Email, phone,
+      # twitter/facebook handles, and similar handle data must be sent in
+      # the nested `infos:` array — each entry is `{kind:, value:, label:,
+      # custom_label?}`. Pre-v0.2.7 versions of this gem accepted a wider
+      # list (email, phone_number, company_name, twitter_handle,
+      # facebook_handle, notes, custom_fields), but Missive silently
+      # dropped every one of those — the API never persisted them. They've
+      # been removed to stop masking that contract mismatch.
+      #
+      # Valid `infos.kind` values include: email, phone_number, twitter,
+      # facebook, address, organization, url, im, birthday, note, etc.
+      # `label` is one of Missive's predefined enum values per kind
+      # (e.g. email: home/work/personal/other; phone_number: mobile/main/
+      # home/work/...). Pass `custom_label:` when label is `other`.
       ALLOWED_UPDATE_FIELDS = %w[
-        id email first_name last_name
-        phone_number notes company_name
-        twitter_handle facebook_handle
-        custom_fields contact_book
+        id first_name last_name
+        contact_book infos
       ].freeze
 
       attr_reader :client

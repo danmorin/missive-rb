@@ -238,6 +238,47 @@ RSpec.describe Missive::Resources::Contacts do
       )
     end
 
+    it "strips legacy handle fields that Missive silently drops (post-v0.2.7)" do
+      legacy = {
+        "id"              => "contact_123",
+        "first_name"      => "Jane",
+        "email"           => "jane@example.com",
+        "phone_number"    => "+15555550100",
+        "company_name"    => "Acme",
+        "twitter_handle"  => "jane",
+        "facebook_handle" => "jane.fb",
+        "notes"           => "irrelevant",
+        "custom_fields"   => { "x" => 1 }
+      }
+      allow(connection).to receive(:request).and_return(response)
+
+      contacts.update(contact_hashes: legacy)
+
+      expect(connection).to have_received(:request).with(
+        :patch,
+        "/contacts/contact_123",
+        body: { contacts: [{ "id" => "contact_123", "first_name" => "Jane" }] }
+      )
+    end
+
+    it "preserves the infos array (canonical handle path)" do
+      with_infos = {
+        "id" => "contact_123",
+        "infos" => [
+          { kind: "email", value: "jane@example.com", label: "personal" }
+        ]
+      }
+      allow(connection).to receive(:request).and_return(response)
+
+      contacts.update(contact_hashes: with_infos)
+
+      expect(connection).to have_received(:request).with(
+        :patch,
+        "/contacts/contact_123",
+        body: { contacts: [with_infos] }
+      )
+    end
+
     it "preserves all keys when skip_validation is true" do
       update_with_extra = {
         "id" => "contact_123",

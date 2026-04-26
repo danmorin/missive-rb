@@ -1,5 +1,25 @@
 ## [Unreleased]
 
+## [0.2.7]
+
+### Fixed (breaking — Contacts)
+
+Live testing surfaced that Missive's `/v1/contacts` endpoint silently
+ignores the flat handle fields (`email`, `phone_number`, `company_name`,
+`twitter_handle`, `facebook_handle`, `notes`, `custom_fields`) the gem
+had been sending since v0.1. Missive only persists `first_name`,
+`last_name`, `contact_book` at the top level — handles must be supplied
+in a nested `infos:` array of `{kind:, value:, label:, custom_label?}`
+hashes.
+
+- **`Resources::Contacts::ALLOWED_UPDATE_FIELDS`** narrowed to
+  `id`, `first_name`, `last_name`, `contact_book`, `infos`. Pre-v0.2.7
+  callers passing the removed fields will see the keys silently filtered
+  by the gem (same observable outcome as before, just earlier — Missive
+  was dropping them anyway).
+- **README/YARD examples** updated to show the correct `infos:` shape
+  for email/phone/social handles.
+
 ## [0.2.6]
 
 ### Fixed

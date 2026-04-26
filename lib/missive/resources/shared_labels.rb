@@ -24,33 +24,46 @@ module Missive
       # @return [Array<Missive::Object>] Array of created label objects
       # @raise [ArgumentError] If labels are invalid
       def create(labels:)
-        validate_labels(labels)
+        validate_labels_for_create(labels)
 
         payload = { shared_labels: labels }
 
         ActiveSupport::Notifications.instrument("missive.shared_labels.create", payload: payload) do
           response = @client.connection.request(:post, CREATE, body: payload)
-          # Assuming response is an array of created labels
-          Array(response).map { |label| Missive::Object.new(label, @client) }
+          # Missive returns { shared_labels: [...created labels...] }; older code
+          # used `Array(response)` which collapsed the envelope into a single
+          # empty Missive::Object. Extract the inner array correctly.
+          inner = response[:shared_labels] || response["shared_labels"] || []
+          inner.map { |label| Missive::Object.new(label, @client) }
         end
       end
 
       # Update shared labels
       #
+      # Missive's PATCH /v1/shared_labels/:ids endpoint accepts an array body
+      # `{shared_labels: [{id: ..., name: ..., color: ..., parent: ...}, ...]}`.
+      #
+      # NOTE: `organization` is REQUIRED on create but FORBIDDEN on update —
+      # Missive returns "Unpermitted parameters: organization" if you include
+      # it in the update payload. The gem strips :organization from each
+      # label hash to keep the call from 422-ing on a field the API rejects
+      # for this verb.
+      #
       # @param labels [Array<Hash>] Array of label objects to update (must include id)
       # @return [Array<Missive::Object>] Array of updated label objects
-      # @raise [ArgumentError] If labels are invalid
+      # @raise [ArgumentError] If labels are invalid (missing id)
       def update(labels:)
-        validate_labels(labels)
-        ids = labels.map { |label| label[:id] || label["id"] }.compact
+        validate_labels_for_update(labels)
+        sanitized = labels.map { |l| l.reject { |k, _| %i[organization].include?(k.to_sym) } }
+        ids = sanitized.map { |label| label[:id] || label["id"] }.compact
 
         path = format(UPDATE, ids: ids.join(","))
-        payload = { shared_labels: labels }
+        payload = { shared_labels: sanitized }
 
         ActiveSupport::Notifications.instrument("missive.shared_labels.update", payload: payload) do
           response = @client.connection.request(:patch, path, body: payload)
-          # Assuming response is an array of updated labels
-          Array(response).map { |label| Missive::Object.new(label, @client) }
+          inner = response[:shared_labels] || response["shared_labels"] || []
+          inner.map { |label| Missive::Object.new(label, @client) }
         end
       end
 
@@ -97,11 +110,30 @@ module Missive
 
       attr_reader :client
 
-      def validate_labels(labels)
+      def validate_labels_for_create(labels)
         Array(labels).each do |label|
-          validate_required_fields(label)
+          name = label[:name] || label["name"]
+          organization = label[:organization] || label["organization"]
+          raise ArgumentError, "Each label must have a name" unless name
+          raise ArgumentError, "Each label must have an organization" unless organization
           validate_color(label[:color] || label["color"]) if label[:color] || label["color"]
         end
+      end
+
+      # Update validation only requires id; Missive validates the rest of
+      # the fields server-side (and rejects organization outright on PATCH).
+      def validate_labels_for_update(labels)
+        Array(labels).each do |label|
+          id = label[:id] || label["id"]
+          raise ArgumentError, "Each label must have an id for update" unless id
+          validate_color(label[:color] || label["color"]) if label[:color] || label["color"]
+        end
+      end
+
+      # Backwards-compat alias for any external callers that wrapped the
+      # private API. New code should use the per-verb validators above.
+      def validate_labels(labels)
+        validate_labels_for_create(labels)
       end
 
       def validate_required_fields(label)

@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [0.2.6]
+
+### Fixed
+
+- **`Resources::SharedLabels#create` and `#update` response unwrapping**. Both methods previously returned an Array of Missive::Object whose `attributes` were the entire `{shared_labels: [...]}` envelope (since `Array(hash).map` collapsed the response into a single empty object). Fixed to extract `response[:shared_labels]` and wrap each inner label individually, mirroring the gem's other resource patterns.
+- **`Resources::SharedLabels#update` validation** is now separate from `#create` validation. Update only requires `id` per label hash; create still requires `name` + `organization`. Previously the same `validate_required_fields` ran for both verbs, blocking id-only renames.
+- **`Resources::SharedLabels#update` strips `organization` from the request body**. Missive's PATCH endpoint returns `"Unpermitted parameters: organization"` if it's included. The gem now silently drops it before the API call.
+
 ## [0.2.5]
 
 ### Fixed (breaking — Responses CRUD)

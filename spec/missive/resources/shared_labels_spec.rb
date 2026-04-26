@@ -27,10 +27,13 @@ RSpec.describe Missive::Resources::SharedLabels do
     end
 
     let(:response_data) do
-      [
-        { "id" => "label-1", "name" => "Important", "organization" => "org-123" },
-        { "id" => "label-2", "name" => "Urgent", "organization" => "org-123" }
-      ]
+      # Missive returns the canonical envelope `{shared_labels: [...]}`.
+      {
+        shared_labels: [
+          { "id" => "label-1", "name" => "Important", "organization" => "org-123" },
+          { "id" => "label-2", "name" => "Urgent", "organization" => "org-123" }
+        ]
+      }
     end
 
     context "successful creation" do
@@ -111,21 +114,33 @@ RSpec.describe Missive::Resources::SharedLabels do
 
   describe "#update" do
     let(:labels_to_update) do
+      # Note: organization is INCLUDED in inputs to verify the gem strips it
+      # before hitting Missive (the API rejects organization on PATCH with
+      # "Unpermitted parameters: organization").
       [
         { id: "label-1", name: "Updated Important", organization: "org-123", color: "#00ff00" },
         { id: "label-2", name: "Updated Urgent", organization: "org-123", color: "danger" }
       ]
     end
 
-    let(:response_data) do
+    let(:sanitized_labels) do
       [
-        { "id" => "label-1", "name" => "Updated Important" },
-        { "id" => "label-2", "name" => "Updated Urgent" }
+        { id: "label-1", name: "Updated Important", color: "#00ff00" },
+        { id: "label-2", name: "Updated Urgent", color: "danger" }
       ]
     end
 
-    it "concatenates ids correctly in path" do
-      expected_payload = { shared_labels: labels_to_update }
+    let(:response_data) do
+      {
+        shared_labels: [
+          { "id" => "label-1", "name" => "Updated Important" },
+          { "id" => "label-2", "name" => "Updated Urgent" }
+        ]
+      }
+    end
+
+    it "concatenates ids correctly in path and strips organization from body" do
+      expected_payload = { shared_labels: sanitized_labels }
 
       expect(connection).to receive(:request).with(
         :patch,
@@ -134,6 +149,22 @@ RSpec.describe Missive::Resources::SharedLabels do
       ).and_return(response_data)
 
       shared_labels.update(labels: labels_to_update)
+    end
+
+    it "accepts label hashes that omit organization (id-only update)" do
+      minimal = [{ id: "label-1", name: "Just renamed" }]
+      expect(connection).to receive(:request).with(
+        :patch,
+        "/shared_labels/label-1",
+        body: { shared_labels: minimal }
+      ).and_return(response_data)
+
+      expect { shared_labels.update(labels: minimal) }.not_to raise_error
+    end
+
+    it "raises ArgumentError when an entry is missing id" do
+      expect { shared_labels.update(labels: [{ name: "X" }]) }
+        .to raise_error(ArgumentError, "Each label must have an id for update")
     end
 
     it "returns array of updated objects" do
@@ -151,7 +182,7 @@ RSpec.describe Missive::Resources::SharedLabels do
         allow(connection).to receive(:request).and_return(response_data)
 
         expect(connection).to receive(:request).with(:patch, "/shared_labels/label-1,label-2",
-                                                     body: { shared_labels: labels_to_update })
+                                                     body: { shared_labels: sanitized_labels })
 
         shared_labels.update(labels: labels_to_update)
       end

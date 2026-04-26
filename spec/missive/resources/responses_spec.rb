@@ -165,4 +165,84 @@ RSpec.describe Missive::Resources::Responses do
       end
     end
   end
+
+  describe "#create" do
+    let(:created) { { "id" => "resp-new", "name" => "Hello", "body" => "<p>Hi</p>" } }
+    let(:response_envelope) { { responses: created } }
+
+    it "POSTs to /responses with name + body" do
+      expected = { responses: { name: "Hello", body: "<p>Hi</p>" } }
+      expect(connection).to receive(:request).with(:post, "/responses", body: expected).and_return(response_envelope)
+
+      result = responses.create(name: "Hello", body: "<p>Hi</p>")
+      expect(result).to be_a(Missive::Object)
+      expect(result.id).to eq("resp-new")
+    end
+
+    it "merges optional attrs (organization, shared, shared_label) into payload" do
+      expected = { responses: { name: "Hello", body: "<p>Hi</p>", organization: "org-1", shared: true } }
+      expect(connection).to receive(:request).with(:post, "/responses", body: expected).and_return(response_envelope)
+
+      responses.create(name: "Hello", body: "<p>Hi</p>", organization: "org-1", shared: true)
+    end
+
+    it "raises ArgumentError when name is blank" do
+      expect { responses.create(name: "", body: "<p>Hi</p>") }
+        .to raise_error(ArgumentError, "name cannot be blank")
+    end
+
+    it "raises ArgumentError when body is blank" do
+      expect { responses.create(name: "Hello", body: "  ") }
+        .to raise_error(ArgumentError, "body cannot be blank")
+    end
+
+    it "raises ServerError when API returns no responses key" do
+      allow(connection).to receive(:request).and_return({})
+      expect { responses.create(name: "Hello", body: "<p>Hi</p>") }
+        .to raise_error(Missive::ServerError, "Response creation failed")
+    end
+  end
+
+  describe "#update" do
+    let(:updated) { { "id" => "resp-1", "name" => "New name", "body" => "<p>New</p>" } }
+
+    it "PATCHes /responses/:id with attrs" do
+      expected = { responses: { name: "New name" } }
+      expect(connection).to receive(:request).with(:patch, "/responses/resp-1", body: expected).and_return({ responses: updated })
+
+      result = responses.update(id: "resp-1", name: "New name")
+      expect(result.id).to eq("resp-1")
+      expect(result.name).to eq("New name")
+    end
+
+    it "raises ArgumentError when id is blank" do
+      expect { responses.update(id: "") }.to raise_error(ArgumentError, "id cannot be blank")
+    end
+
+    it "raises ArgumentError when no attrs provided" do
+      expect { responses.update(id: "resp-1") }.to raise_error(ArgumentError, "no attributes provided for update")
+    end
+
+    it "raises ServerError when API returns no responses key" do
+      allow(connection).to receive(:request).and_return({})
+      expect { responses.update(id: "resp-1", name: "X") }
+        .to raise_error(Missive::ServerError, "Response update failed")
+    end
+  end
+
+  describe "#delete" do
+    it "DELETEs /responses/:id and returns true" do
+      expect(connection).to receive(:request).with(:delete, "/responses/resp-1").and_return(nil)
+      expect(responses.delete(id: "resp-1")).to eq(true)
+    end
+
+    it "raises ArgumentError when id is blank" do
+      expect { responses.delete(id: nil) }.to raise_error(ArgumentError, "id cannot be blank")
+    end
+
+    it "surfaces NotFoundError" do
+      allow(connection).to receive(:request).and_raise(Missive::NotFoundError.new("not found"))
+      expect { responses.delete(id: "resp-1") }.to raise_error(Missive::NotFoundError)
+    end
+  end
 end

@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [0.2.4]
+
+### Added
+
+- **`Resources::Responses#create(name:, body:, **attrs)`** — `POST /v1/responses`. Optional attrs: `organization`, `shared`, `shared_with_team`, `shared_label`.
+- **`Resources::Responses#update(id:, **attrs)`** — `PATCH /v1/responses/:id`. Updates name/body/sharing scope.
+- **`Resources::Responses#delete(id:)`** — `DELETE /v1/responses/:id`. Returns `true`; surfaces `Missive::NotFoundError` for 404.
+
+Closes the `#list`/`#get` gap in the Responses resource so saved-response templates can be programmatically managed.
+
 ## [0.2.3]
 
 ### Added

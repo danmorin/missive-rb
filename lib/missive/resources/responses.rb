@@ -7,6 +7,9 @@ module Missive
       # Path constants
       LIST = "/responses"
       GET = "/responses/%<id>s"
+      CREATE = "/responses"
+      UPDATE = "/responses/%<id>s"
+      DELETE = "/responses/%<id>s"
 
       # @param client [Missive::Client] The API client instance
       def initialize(client)
@@ -69,6 +72,80 @@ module Missive
           raise Missive::NotFoundError, "Response not found" if responses.empty?
 
           Missive::Object.new(responses.first, @client)
+        end
+      end
+
+      # Create a response template
+      #
+      # @param name [String] Response template name (required)
+      # @param body [String] HTML or text body for the response (required)
+      # @param attrs [Hash] Additional attributes (e.g. :organization, :shared,
+      #   :shared_with_team, :shared_label)
+      # @return [Missive::Object] The created response
+      # @raise [ArgumentError] If name or body are missing/blank
+      # @example
+      #   client.responses.create(
+      #     name: "Hello",
+      #     body: "<p>Thanks for reaching out!</p>",
+      #     organization: "org-1"
+      #   )
+      def create(name:, body:, **attrs)
+        raise ArgumentError, "name cannot be blank" if name.nil? || name.to_s.strip.empty?
+        raise ArgumentError, "body cannot be blank" if body.nil? || body.to_s.strip.empty?
+
+        payload = { responses: { name: name, body: body }.merge(attrs) }
+
+        ActiveSupport::Notifications.instrument("missive.responses.create", payload: payload) do
+          response = @client.connection.request(:post, CREATE, body: payload)
+          response_data = response[:responses] || response["responses"]
+          raise Missive::ServerError, "Response creation failed" if response_data.nil?
+
+          # API may return either a single hash or a [single] array.
+          response_data = response_data.is_a?(Array) ? response_data.first : response_data
+          Missive::Object.new(response_data, @client)
+        end
+      end
+
+      # Update a response template
+      #
+      # @param id [String] Response ID (required)
+      # @param attrs [Hash] Attributes to update (e.g. :name, :body,
+      #   :organization, :shared, :shared_with_team, :shared_label)
+      # @return [Missive::Object] The updated response
+      # @raise [ArgumentError] If id is missing or no attributes provided
+      # @example
+      #   client.responses.update(id: "resp-1", body: "<p>Updated.</p>")
+      def update(id:, **attrs)
+        raise ArgumentError, "id cannot be blank" if id.nil? || id.to_s.strip.empty?
+        raise ArgumentError, "no attributes provided for update" if attrs.empty?
+
+        path = format(UPDATE, id: id)
+        payload = { responses: attrs }
+
+        ActiveSupport::Notifications.instrument("missive.responses.update", id: id, payload: payload) do
+          response = @client.connection.request(:patch, path, body: payload)
+          response_data = response[:responses] || response["responses"]
+          raise Missive::ServerError, "Response update failed" if response_data.nil?
+
+          response_data = response_data.is_a?(Array) ? response_data.first : response_data
+          Missive::Object.new(response_data, @client)
+        end
+      end
+
+      # Delete a response template
+      #
+      # @param id [String] Response ID (required)
+      # @return [Boolean] True on success
+      # @raise [ArgumentError] If id is missing
+      # @raise [Missive::NotFoundError] If response not found
+      def delete(id:)
+        raise ArgumentError, "id cannot be blank" if id.nil? || id.to_s.strip.empty?
+
+        path = format(DELETE, id: id)
+
+        ActiveSupport::Notifications.instrument("missive.responses.delete", id: id) do
+          @client.connection.request(:delete, path)
+          true
         end
       end
 

@@ -401,13 +401,13 @@ module Missive
       #
       # Returns the conversation to the inbox for everyone with access.
       #
-      # On POST /posts, `reopen` means the OPPOSITE thing — Missive documents
-      # it as "prevents closed conversations from reopening when creating a
-      # post". Since a post already reopens a closed conversation by default,
-      # the posts route here sends a plain post with no reopen attr at all;
-      # only the PATCH route sends `reopen: true`. Setting that flag on a post
-      # (as this gem did through v0.2.7) kept the conversation closed, which
-      # is exactly backwards.
+      # `reopen` behaves as a plain boolean on BOTH endpoints — verified
+      # against the live API 2026-08-09. Missive's docs claim that on
+      # POST /posts it means the inverse ("Set to `true` to keep the
+      # conversation closed even after adding the new post"); it does not.
+      # Observed behaviour on a post: `true` reopens, `false` suppresses the
+      # reopen, and OMITTING it reopens (a post counts as new activity).
+      # That last case is the trap — see {Missive::Resources::Posts}.
       #
       # @param id [String] The conversation ID
       # @param opts [Hash] Optional pass-through attrs
@@ -421,7 +421,7 @@ module Missive
         conversation_action(
           id: id,
           patch_attrs: { reopen: true },
-          post_attrs: {},
+          post_attrs: { reopen: true },
           defaults: { title: "Conversation reopened", text: "Conversation reopened via API" },
           opts: opts
         )

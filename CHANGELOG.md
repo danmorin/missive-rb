@@ -1,5 +1,28 @@
 ## [Unreleased]
 
+## [0.2.9]
+
+### Fixed
+
+- **`#reopen` sends `reopen: true` on the posts route again**, reverting the
+  change made in v0.2.8. Live testing against the API on 2026-08-09 showed
+  that v0.2.8's premise was wrong: `reopen` is a plain boolean on
+  `POST /v1/posts`, exactly as it is on `PATCH /v1/conversations`. `true`
+  reopens, `false` suppresses the reopen, and omitting it reopens. Missive's
+  documentation claims the opposite ("Set to `true` to keep the conversation
+  closed even after adding the new post") and is simply wrong. v0.2.7's
+  `#reopen` was therefore correct all along — noisy, because it posted a
+  filler comment, but not inverted. The v0.2.8 CHANGELOG entry below
+  describing it as broken is retracted.
+
+### Documented
+
+- **Any post reopens a closed conversation unless you pass `reopen: false`.**
+  This is the real hazard the v0.2.8 PATCH routing addresses, and it applies
+  to every `POST /v1/posts` call — including plain notes that carry no state
+  attrs at all. Callers who want to annotate a closed thread without
+  resurfacing it must set `reopen: false` explicitly.
+
 ## [0.2.8]
 
 ### Added
@@ -40,13 +63,10 @@ dragged it back into everyone's inbox.
 
 ### Fixed
 
-- **`#reopen` no longer sends `reopen: true` on the posts route.** On
-  `POST /posts` that attr means the opposite of what the method name
-  promises — Missive documents it as "prevents closed conversations from
-  reopening when creating a post" — so through v0.2.7 `#reopen` posted a
-  comment and then explicitly kept the conversation closed. A plain post
-  already reopens a closed conversation, so the posts route now sends no
-  `reopen` attr at all and only the PATCH route sends `reopen: true`.
+- ~~**`#reopen` no longer sends `reopen: true` on the posts route.**~~
+  **RETRACTED in 0.2.9** — this was based on Missive's documentation, which
+  describes the attr backwards. `reopen` is a plain boolean on both
+  endpoints and v0.2.7's `#reopen` worked correctly. See 0.2.9 above.
 
 ## [0.2.7]
 

@@ -737,12 +737,11 @@ RSpec.describe Missive::Resources::Conversations do
       resource.reopen(id: "conv-123")
     end
 
-    # On POST /posts, `reopen: true` means "keep it closed" — the exact
-    # opposite of this method's contract. A plain post already reopens a
-    # closed conversation, so the posts route must NOT send the flag.
-    it "omits the reopen attr on the posts route, where it means the opposite" do
+    # `reopen` is a plain boolean on the posts route too (live-verified
+    # 2026-08-09), despite Missive's docs claiming true means "keep closed".
+    it "sends reopen: true on the posts route as well" do
       expect(posts_resource).to receive(:create) do |**args|
-        expect(args).not_to have_key(:reopen)
+        expect(args[:reopen]).to eq(true)
         expect(args[:conversation]).to eq("conv-123")
         expect(args[:text]).to eq("Picking this back up.")
         post_response

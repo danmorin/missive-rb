@@ -29,11 +29,20 @@ module Missive
 
       # Create a post
       #
-      # A post is the canonical way to mutate a conversation in Missive's
-      # REST API. It can carry visible content (text/markdown/attachments),
-      # mutate conversation state (close, reopen, label changes, assignee
-      # changes, inbox moves), or both. At least one of those must be
-      # present.
+      # A post can carry visible content (text/markdown/attachments), mutate
+      # conversation state (close, reopen, label changes, assignee changes,
+      # inbox moves), or both. At least one of those must be present.
+      #
+      # For state changes with no visible content, prefer
+      # {Missive::Resources::Conversations#update} — it wraps
+      # `PATCH /v1/conversations/:id`, which changes state silently.
+      #
+      # CAUTION: creating a post REOPENS a closed conversation. That holds
+      # even for a plain note carrying no state attrs, because a post counts
+      # as new activity. Pass `reopen: false` to suppress it. Missive's docs
+      # describe this attr backwards ("Set to `true` to keep the conversation
+      # closed"); live testing on 2026-08-09 confirmed it is a plain boolean —
+      # `true` reopens, `false` suppresses, omitted reopens.
       #
       # @param text [String, nil] Plain text content
       # @param markdown [String, nil] Markdown content

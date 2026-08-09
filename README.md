@@ -258,7 +258,20 @@ client.conversations.add_to_team_inbox(id: "conv-123", team: "team-1")
 client.conversations.merge(id: "src-123", target: "dst-456", subject: "Combined thread")
 ```
 
-Prefer the posts route when the change should be auditable in the thread — pass `text:`/`markdown:` (or `via: :post` for the gem's default filler text) and the action becomes a post with a notification attached. Prefer the default PATCH route for housekeeping: a post counts as new activity, so labeling or assigning through it pulls closed conversations back into everyone's inbox.
+Prefer the posts route when the change should be auditable in the thread — pass `text:`/`markdown:` (or `via: :post` for the gem's default filler text) and the action becomes a post with a notification attached. Prefer the default PATCH route for housekeeping: **a post counts as new activity, so it reopens a closed conversation** — labeling or assigning through it pulls closed threads back into everyone's inbox.
+
+That applies to plain notes too. To annotate a closed conversation without resurfacing it, pass `reopen: false`:
+
+```ruby
+client.posts.create(
+  conversation: "conv-123",
+  markdown:     "FYI — customer replied on the phone instead.",
+  notification: { title: "Note", body: "phone follow-up" },
+  reopen:       false
+)
+```
+
+Missive's documentation describes `reopen` backwards on the posts endpoint ("Set to `true` to keep the conversation closed"). It is a plain boolean on both endpoints: `true` reopens, `false` suppresses the reopen, omitted reopens. Verified against the live API on 2026-08-09.
 
 ##### Bulk updates
 

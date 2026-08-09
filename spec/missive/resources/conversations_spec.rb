@@ -529,20 +529,165 @@ RSpec.describe Missive::Resources::Conversations do
   let(:post_response) { Missive::Object.new({ "id" => "post-999" }, client) }
   let(:default_notification) { { title: kind_of(String), body: "via Missive API" } }
 
+  # Stub PATCH /conversations/:ids and return the echoed conversations.
+  def expect_patch(ids, attrs)
+    id_list = Array(ids)
+    expect(connection).to receive(:request)
+      .with(:patch, "/conversations/#{id_list.join(",")}",
+            body: { conversations: id_list.map { |id| attrs.merge(id: id) } })
+      .and_return({ conversations: id_list.map { |id| { "id" => id } } })
+  end
+
+  describe "#update" do
+    it "PATCHes a single conversation and returns wrapped objects" do
+      expect_patch("conv-123", close: true)
+
+      result = resource.update(ids: "conv-123", close: true)
+      expect(result.map(&:id)).to eq(["conv-123"])
+    end
+
+    it "PATCHes many conversations in one call with comma-separated IDs" do
+      expect_patch(%w[conv-1 conv-2 conv-3], close: true)
+
+      result = resource.update(ids: %w[conv-1 conv-2 conv-3], close: true)
+      expect(result.size).to eq(3)
+    end
+
+    it "repeats the id inside each body object, as the API requires" do
+      expect(connection).to receive(:request) do |method, path, body:|
+        expect(method).to eq(:patch)
+        expect(path).to eq("/conversations/conv-1,conv-2")
+        expect(body[:conversations]).to eq([
+                                             { subject: "Renamed", id: "conv-1" },
+                                             { subject: "Renamed", id: "conv-2" }
+                                           ])
+        { conversations: [] }
+      end
+
+      resource.update(ids: %w[conv-1 conv-2], subject: "Renamed")
+    end
+
+    it "instruments the update" do
+      events = []
+      ActiveSupport::Notifications.subscribe("missive.conversations.update") do |*args|
+        events << ActiveSupport::Notifications::Event.new(*args)
+      end
+      expect_patch("conv-123", close: true)
+
+      resource.update(ids: "conv-123", close: true)
+      expect(events.first.payload[:ids]).to eq(["conv-123"])
+    ensure
+      ActiveSupport::Notifications.unsubscribe("missive.conversations.update")
+    end
+
+    it "raises when ids are missing or blank" do
+      expect { resource.update(ids: nil, close: true) }.to raise_error(ArgumentError, "ids[0] is required")
+      expect { resource.update(ids: [], close: true) }.to raise_error(ArgumentError, "ids cannot be empty")
+      expect { resource.update(ids: ["conv-1", ""], close: true) }
+        .to raise_error(ArgumentError, "ids[1] is required")
+    end
+
+    it "raises when no attributes are given" do
+      expect { resource.update(ids: "conv-123") }.to raise_error(ArgumentError, "attrs cannot be empty")
+    end
+
+    it "raises on duplicate ids, which the API rejects" do
+      expect { resource.update(ids: %w[conv-1 conv-1], close: true) }
+        .to raise_error(ArgumentError, "duplicate conversation ids: conv-1")
+    end
+
+    it "raises when an org-dependent attr is set without organization" do
+      expect { resource.update(ids: "conv-123", add_shared_labels: ["lbl-1"]) }
+        .to raise_error(ArgumentError, "organization is required when setting add_shared_labels")
+      expect { resource.update(ids: "conv-123", add_assignees: ["user-1"]) }
+        .to raise_error(ArgumentError, "organization is required when setting add_assignees")
+    end
+
+    it "accepts org-dependent attrs when organization is present" do
+      expect_patch("conv-123", add_shared_labels: ["lbl-1"], organization: "org-1")
+
+      resource.update(ids: "conv-123", add_shared_labels: ["lbl-1"], organization: "org-1")
+    end
+  end
+
+  describe "#update_each" do
+    it "sends per-conversation attributes" do
+      expect(connection).to receive(:request) do |_method, path, body:|
+        expect(path).to eq("/conversations/conv-1,conv-2")
+        expect(body[:conversations]).to eq([
+                                             { id: "conv-1", close: true },
+                                             { id: "conv-2", subject: "Renamed" }
+                                           ])
+        { conversations: [] }
+      end
+
+      resource.update_each(conversations: [
+                             { id: "conv-1", close: true },
+                             { id: "conv-2", subject: "Renamed" }
+                           ])
+    end
+
+    it "normalizes string keys" do
+      expect_patch("conv-1", close: true)
+
+      resource.update_each(conversations: [{ "id" => "conv-1", "close" => true }])
+    end
+
+    it "raises when the payload is empty or malformed" do
+      expect { resource.update_each(conversations: []) }
+        .to raise_error(ArgumentError, "conversations cannot be empty")
+      expect { resource.update_each(conversations: "nope") }
+        .to raise_error(ArgumentError, "conversations must be an array")
+      expect { resource.update_each(conversations: [{ close: true }]) }
+        .to raise_error(ArgumentError, "each conversation requires an id")
+      expect { resource.update_each(conversations: [{ id: "conv-1" }]) }
+        .to raise_error(ArgumentError, "conversation conv-1 has no attributes to update")
+    end
+  end
+
   describe "#close" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with close: true + default notification + default text" do
+    it "PATCHes close: true by default, leaving no post in the thread" do
+      expect(posts_resource).not_to receive(:create)
+      expect_patch("conv-123", close: true)
+
+      result = resource.close(id: "conv-123")
+      expect(result.map(&:id)).to eq(["conv-123"])
+    end
+
+    it "falls back to the posts route when the caller supplies content" do
       expect(posts_resource).to receive(:create) do |**args|
         expect(args[:conversation]).to eq("conv-123")
         expect(args[:close]).to eq(true)
-        expect(args[:notification]).to eq(title: "Conversation closed", body: "via Missive API")
-        expect(args[:text]).to eq("Conversation closed via API")
+        expect(args[:text]).to eq("Resolved.")
         post_response
       end
 
-      result = resource.close(id: "conv-123")
+      resource.close(id: "conv-123", text: "Resolved.")
+    end
+
+    it "uses the posts route on an explicit via: :post, with default text and notification" do
+      expect(posts_resource).to receive(:create) do |**args|
+        expect(args[:close]).to eq(true)
+        expect(args[:notification]).to eq(title: "Conversation closed", body: "via Missive API")
+        expect(args[:text]).to eq("Conversation closed via API")
+        expect(args).not_to have_key(:via)
+        post_response
+      end
+
+      result = resource.close(id: "conv-123", via: :post)
       expect(result).to eq(post_response)
+    end
+
+    it "raises when post content is combined with via: :patch" do
+      expect { resource.close(id: "conv-123", text: "Resolved.", via: :patch) }
+        .to raise_error(ArgumentError, /text only apply to the posts route/)
+    end
+
+    it "raises on an unknown via" do
+      expect { resource.close(id: "conv-123", via: :carrier_pigeon) }
+        .to raise_error(ArgumentError, /via must be one of/)
     end
 
     it "uses caller-supplied text instead of the default" do
@@ -585,15 +730,25 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#reopen" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with reopen: true + default notification + default text" do
+    it "PATCHes reopen: true by default" do
+      expect(posts_resource).not_to receive(:create)
+      expect_patch("conv-123", reopen: true)
+
+      resource.reopen(id: "conv-123")
+    end
+
+    # On POST /posts, `reopen: true` means "keep it closed" — the exact
+    # opposite of this method's contract. A plain post already reopens a
+    # closed conversation, so the posts route must NOT send the flag.
+    it "omits the reopen attr on the posts route, where it means the opposite" do
       expect(posts_resource).to receive(:create) do |**args|
-        expect(args[:reopen]).to eq(true)
-        expect(args[:notification]).to eq(title: "Conversation reopened", body: "via Missive API")
-        expect(args[:text]).to eq("Conversation reopened via API")
+        expect(args).not_to have_key(:reopen)
+        expect(args[:conversation]).to eq("conv-123")
+        expect(args[:text]).to eq("Picking this back up.")
         post_response
       end
 
-      resource.reopen(id: "conv-123")
+      resource.reopen(id: "conv-123", text: "Picking this back up.")
     end
 
     it "raises ArgumentError when id is missing" do
@@ -604,7 +759,16 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#add_labels" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with add_shared_labels + organization + default text" do
+    it "PATCHes add_shared_labels + organization by default" do
+      expect(posts_resource).not_to receive(:create)
+      expect_patch("conv-123", add_shared_labels: ["lbl-1", "lbl-2"], organization: "org-1")
+
+      resource.add_labels(id: "conv-123", labels: ["lbl-1", "lbl-2"], organization: "org-1")
+    end
+
+    # Labeling through a post resurfaces conversations the team had closed.
+    # PATCH is the default precisely to avoid that.
+    it "uses posts.create only when a trace is requested" do
       expect(posts_resource).to receive(:create) do |**args|
         expect(args[:add_shared_labels]).to eq(["lbl-1", "lbl-2"])
         expect(args[:organization]).to eq("org-1")
@@ -613,7 +777,7 @@ RSpec.describe Missive::Resources::Conversations do
         post_response
       end
 
-      resource.add_labels(id: "conv-123", labels: ["lbl-1", "lbl-2"], organization: "org-1")
+      resource.add_labels(id: "conv-123", labels: ["lbl-1", "lbl-2"], organization: "org-1", via: :post)
     end
 
     it "raises when organization is missing" do
@@ -645,16 +809,22 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#remove_labels" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with remove_shared_labels + organization + default text" do
+    it "PATCHes remove_shared_labels + organization by default" do
+      expect(posts_resource).not_to receive(:create)
+      expect_patch("conv-123", remove_shared_labels: ["lbl-1"], organization: "org-1")
+
+      resource.remove_labels(id: "conv-123", labels: ["lbl-1"], organization: "org-1")
+    end
+
+    it "uses posts.create only when a trace is requested" do
       expect(posts_resource).to receive(:create) do |**args|
         expect(args[:remove_shared_labels]).to eq(["lbl-1"])
-        expect(args[:organization]).to eq("org-1")
         expect(args[:notification]).to eq(title: "Labels removed", body: "via Missive API")
         expect(args[:text]).to eq("Labels removed via API")
         post_response
       end
 
-      resource.remove_labels(id: "conv-123", labels: ["lbl-1"], organization: "org-1")
+      resource.remove_labels(id: "conv-123", labels: ["lbl-1"], organization: "org-1", via: :post)
     end
 
     it "raises when organization is missing" do
@@ -671,16 +841,22 @@ RSpec.describe Missive::Resources::Conversations do
   describe "#assign" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with add_assignees + organization + default text" do
+    it "PATCHes add_assignees + organization by default" do
+      expect(posts_resource).not_to receive(:create)
+      expect_patch("conv-123", add_assignees: ["user-1"], organization: "org-1")
+
+      resource.assign(id: "conv-123", users: ["user-1"], organization: "org-1")
+    end
+
+    it "uses posts.create only when a trace is requested" do
       expect(posts_resource).to receive(:create) do |**args|
         expect(args[:add_assignees]).to eq(["user-1"])
-        expect(args[:organization]).to eq("org-1")
         expect(args[:notification]).to eq(title: "Assignees updated", body: "via Missive API")
         expect(args[:text]).to eq("Assignees updated via API")
         post_response
       end
 
-      resource.assign(id: "conv-123", users: ["user-1"], organization: "org-1")
+      resource.assign(id: "conv-123", users: ["user-1"], organization: "org-1", via: :post)
     end
 
     it "raises when users is empty" do
@@ -694,10 +870,37 @@ RSpec.describe Missive::Resources::Conversations do
     end
   end
 
+  describe "#unassign" do
+    before { allow(client).to receive(:posts).and_return(posts_resource) }
+
+    it "PATCHes remove_assignees + organization by default" do
+      expect_patch("conv-123", remove_assignees: ["user-1"], organization: "org-1")
+
+      resource.unassign(id: "conv-123", users: ["user-1"], organization: "org-1")
+    end
+
+    it "raises when users is empty" do
+      expect { resource.unassign(id: "conv-123", users: [], organization: "org-1") }
+        .to raise_error(ArgumentError, "users cannot be empty")
+    end
+
+    it "raises when organization is missing" do
+      expect { resource.unassign(id: "conv-123", users: ["user-1"], organization: nil) }
+        .to raise_error(ArgumentError, "organization is required")
+    end
+  end
+
   describe "#add_to_inbox" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with add_to_inbox: true + default notification + default text" do
+    it "PATCHes add_to_inbox: true by default" do
+      expect(posts_resource).not_to receive(:create)
+      expect_patch("conv-123", add_to_inbox: true)
+
+      resource.add_to_inbox(id: "conv-123")
+    end
+
+    it "uses posts.create only when a trace is requested" do
       expect(posts_resource).to receive(:create) do |**args|
         expect(args[:add_to_inbox]).to eq(true)
         expect(args[:notification]).to eq(title: "Moved to inbox", body: "via Missive API")
@@ -705,14 +908,21 @@ RSpec.describe Missive::Resources::Conversations do
         post_response
       end
 
-      resource.add_to_inbox(id: "conv-123")
+      resource.add_to_inbox(id: "conv-123", via: :post)
     end
   end
 
   describe "#add_to_team_inbox" do
     before { allow(client).to receive(:posts).and_return(posts_resource) }
 
-    it "calls posts.create with add_to_team_inbox + team + default notification + default text" do
+    it "PATCHes add_to_team_inbox + team by default" do
+      expect(posts_resource).not_to receive(:create)
+      expect_patch("conv-123", add_to_team_inbox: true, team: "team-1")
+
+      resource.add_to_team_inbox(id: "conv-123", team: "team-1")
+    end
+
+    it "uses posts.create only when a trace is requested" do
       expect(posts_resource).to receive(:create) do |**args|
         expect(args[:add_to_team_inbox]).to eq(true)
         expect(args[:team]).to eq("team-1")
@@ -721,7 +931,7 @@ RSpec.describe Missive::Resources::Conversations do
         post_response
       end
 
-      resource.add_to_team_inbox(id: "conv-123", team: "team-1")
+      resource.add_to_team_inbox(id: "conv-123", team: "team-1", via: :post)
     end
 
     it "raises when team is missing" do

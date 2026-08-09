@@ -20,10 +20,25 @@ module Missive
     class Conversations
       LIST = "/conversations"
       GET = "/conversations/%<id>s"
+      UPDATE = "/conversations/%<ids>s"
       MESSAGES = "/conversations/%<id>s/messages"
       COMMENTS = "/conversations/%<id>s/comments"
       POSTS = "/conversations/%<id>s/posts"
       MERGE = "/conversations/%<id>s/merge"
+
+      # Attrs on PATCH /conversations that Missive requires `organization`
+      # alongside (endpoints.md §Update conversations).
+      ORGANIZATION_DEPENDENT_ATTRS = %i[
+        add_users add_assignees remove_assignees add_shared_labels
+      ].freeze
+
+      # Presence of any of these in an action's opts means the caller wants a
+      # visible trace in the thread, so the action is routed through
+      # POST /posts instead of the silent PATCH endpoint.
+      POST_CONTENT_KEYS = %i[
+        text markdown attachments notification username username_icon
+        conversation_icon
+      ].freeze
 
       attr_reader :client
 
@@ -115,6 +130,75 @@ module Missive
           raise Missive::NotFoundError, "Conversation not found" if conversations.empty?
 
           Missive::Object.new(conversations.first, client)
+        end
+      end
+
+      # Update one or more conversations without creating a post
+      #
+      # Wraps `PATCH /v1/conversations/:id[,:id2,...]` (shipped by Missive
+      # 2026-06-19). This is the endpoint to use for silent state changes —
+      # close, reopen, assign, label, recolor, rename, move. The older
+      # POST /posts route is still valid but always leaves a visible comment
+      # in the thread and, per Missive's docs, a post reopens a closed
+      # conversation unless `reopen: true` is set on it.
+      #
+      # Missive requires the request body to carry one object per ID in the
+      # URL, each repeating its own `id`. This method applies the same attrs
+      # to every ID; pass `conversations:` to {#update_each} for per-ID attrs.
+      #
+      # @param ids [String, Array<String>] One or more conversation IDs
+      # @param attrs [Hash] Attributes to set. Supported by the API:
+      #   :subject, :color, :conversation_color, :organization, :team,
+      #   :force_team, :add_users, :add_assignees, :remove_assignees,
+      #   :add_shared_labels, :remove_shared_labels, :add_to_inbox,
+      #   :add_to_team_inbox, :close, :reopen
+      # @return [Array<Missive::Object>] The updated conversation objects
+      # @raise [ArgumentError] When ids are missing/duplicated or attrs are empty
+      # @example Close a conversation silently
+      #   client.conversations.update(ids: "conv-123", close: true)
+      # @example Close and label a batch in one call
+      #   client.conversations.update(
+      #     ids: %w[conv-1 conv-2 conv-3],
+      #     close: true,
+      #     add_shared_labels: ["lbl-1"],
+      #     organization: "org-1"
+      #   )
+      def update(ids:, **attrs)
+        id_list = normalize_ids(ids)
+        raise ArgumentError, "attrs cannot be empty" if attrs.empty?
+
+        update_each(conversations: id_list.map { |id| attrs.merge(id: id) })
+      end
+
+      # Update several conversations with per-conversation attributes
+      #
+      # Lower-level sibling of {#update} for when each conversation needs a
+      # different payload. Each hash must carry its own `:id`.
+      #
+      # @param conversations [Array<Hash>] One hash per conversation, each with :id
+      # @return [Array<Missive::Object>] The updated conversation objects
+      # @raise [ArgumentError] When the array is empty, an entry lacks :id,
+      #   IDs are duplicated, or an org-dependent attr is set without :organization
+      # @example
+      #   client.conversations.update_each(conversations: [
+      #     { id: "conv-1", close: true },
+      #     { id: "conv-2", subject: "Renamed" }
+      #   ])
+      def update_each(conversations:)
+        raise ArgumentError, "conversations must be an array" unless conversations.is_a?(Array)
+        raise ArgumentError, "conversations cannot be empty" if conversations.empty?
+
+        entries = conversations.map { |entry| normalize_update_entry(entry) }
+        id_list = entries.map { |entry| entry[:id] }
+        validate_unique_ids!(id_list)
+
+        path = format(UPDATE, ids: id_list.join(","))
+        body = { conversations: entries }
+
+        ActiveSupport::Notifications.instrument("missive.conversations.update", ids: id_list) do
+          response = client.connection.request(:patch, path, body: body)
+          updated = response[:conversations] || response["conversations"] || []
+          updated.map { |conversation| Missive::Object.new(conversation, client) }
         end
       end
 
@@ -283,38 +367,64 @@ module Missive
 
       # Close a conversation
       #
-      # Marks the conversation as closed (removed from inbox). Reversible
-      # via {#reopen}. Implemented via POST /posts since Missive's REST
-      # API exposes conversation state mutations through posts rather
-      # than a dedicated PATCH endpoint.
+      # Marks the conversation as closed (removed from inbox) for everyone
+      # with access. Reversible via {#reopen}.
+      #
+      # Routes through `PATCH /conversations/:id` by default, which closes
+      # silently. If you pass post content (`:text`, `:markdown`,
+      # `:attachments`, `:notification`) or `via: :post`, the older
+      # POST /posts route is used instead so the close leaves a visible
+      # comment explaining itself.
       #
       # @param id [String] The conversation ID
       # @param opts [Hash] Optional pass-through attrs (e.g. :text to attach
-      #   a closing comment, :notification, :organization)
-      # @return [Missive::Object] The created post
+      #   a closing comment, :notification, :organization, :via)
+      # @return [Array<Missive::Object>, Missive::Object] Updated conversations
+      #   (PATCH route) or the created post (posts route)
       # @raise [ArgumentError] When id is missing
-      # @example Close a conversation
+      # @example Close a conversation silently
       #   client.conversations.close(id: "conv-123")
-      # @example Close with a closing comment
+      # @example Close with a visible closing comment
       #   client.conversations.close(id: "conv-123", text: "Resolved.")
       def close(id:, **opts)
         validate_id!(id)
-        post_action(id: id, action: :close, default_title: "Conversation closed", default_text: "Conversation closed via API", opts: opts)
+        conversation_action(
+          id: id,
+          patch_attrs: { close: true },
+          post_attrs: { close: true },
+          defaults: { title: "Conversation closed", text: "Conversation closed via API" },
+          opts: opts
+        )
       end
 
       # Reopen a closed conversation
       #
-      # Returns the conversation to the inbox.
+      # Returns the conversation to the inbox for everyone with access.
+      #
+      # On POST /posts, `reopen` means the OPPOSITE thing — Missive documents
+      # it as "prevents closed conversations from reopening when creating a
+      # post". Since a post already reopens a closed conversation by default,
+      # the posts route here sends a plain post with no reopen attr at all;
+      # only the PATCH route sends `reopen: true`. Setting that flag on a post
+      # (as this gem did through v0.2.7) kept the conversation closed, which
+      # is exactly backwards.
       #
       # @param id [String] The conversation ID
       # @param opts [Hash] Optional pass-through attrs
-      # @return [Missive::Object] The created post
+      # @return [Array<Missive::Object>, Missive::Object] Updated conversations
+      #   (PATCH route) or the created post (posts route)
       # @raise [ArgumentError] When id is missing
       # @example
       #   client.conversations.reopen(id: "conv-123")
       def reopen(id:, **opts)
         validate_id!(id)
-        post_action(id: id, action: :reopen, default_title: "Conversation reopened", default_text: "Conversation reopened via API", opts: opts)
+        conversation_action(
+          id: id,
+          patch_attrs: { reopen: true },
+          post_attrs: {},
+          defaults: { title: "Conversation reopened", text: "Conversation reopened via API" },
+          opts: opts
+        )
       end
 
       # Add shared labels to a conversation
@@ -338,12 +448,11 @@ module Missive
         validate_id!(id)
         validate_id_array!(labels, name: "labels")
         validate_present!(organization, name: "organization")
-        post_action(
+        conversation_action(
           id: id,
-          action: :add_shared_labels,
-          action_value: labels,
-          default_title: "Labels added",
-          default_text: "Labels added via API",
+          patch_attrs: { add_shared_labels: labels },
+          post_attrs: { add_shared_labels: labels },
+          defaults: { title: "Labels added", text: "Labels added via API" },
           opts: opts.merge(organization: organization)
         )
       end
@@ -369,12 +478,11 @@ module Missive
         validate_id!(id)
         validate_id_array!(labels, name: "labels")
         validate_present!(organization, name: "organization")
-        post_action(
+        conversation_action(
           id: id,
-          action: :remove_shared_labels,
-          action_value: labels,
-          default_title: "Labels removed",
-          default_text: "Labels removed via API",
+          patch_attrs: { remove_shared_labels: labels },
+          post_attrs: { remove_shared_labels: labels },
+          defaults: { title: "Labels removed", text: "Labels removed via API" },
           opts: opts.merge(organization: organization)
         )
       end
@@ -400,12 +508,39 @@ module Missive
         validate_id!(id)
         validate_id_array!(users, name: "users")
         validate_present!(organization, name: "organization")
-        post_action(
+        conversation_action(
           id: id,
-          action: :add_assignees,
-          action_value: users,
-          default_title: "Assignees updated",
-          default_text: "Assignees updated via API",
+          patch_attrs: { add_assignees: users },
+          post_attrs: { add_assignees: users },
+          defaults: { title: "Assignees updated", text: "Assignees updated via API" },
+          opts: opts.merge(organization: organization)
+        )
+      end
+
+      # Remove assignees from a conversation
+      #
+      # @param id [String] The conversation ID
+      # @param users [Array<String>] Non-empty array of user IDs
+      # @param organization [String] Organization ID (required by API)
+      # @param opts [Hash] Optional pass-through attrs
+      # @return [Array<Missive::Object>, Missive::Object] Updated conversations
+      #   (PATCH route) or the created post (posts route)
+      # @raise [ArgumentError] When required args are missing/empty
+      # @example
+      #   client.conversations.unassign(
+      #     id: "conv-123",
+      #     users: ["user-1"],
+      #     organization: "org-1"
+      #   )
+      def unassign(id:, users:, organization:, **opts)
+        validate_id!(id)
+        validate_id_array!(users, name: "users")
+        validate_present!(organization, name: "organization")
+        conversation_action(
+          id: id,
+          patch_attrs: { remove_assignees: users },
+          post_attrs: { remove_assignees: users },
+          defaults: { title: "Assignees updated", text: "Assignees removed via API" },
           opts: opts.merge(organization: organization)
         )
       end
@@ -420,7 +555,13 @@ module Missive
       #   client.conversations.add_to_inbox(id: "conv-123")
       def add_to_inbox(id:, **opts)
         validate_id!(id)
-        post_action(id: id, action: :add_to_inbox, default_title: "Moved to inbox", default_text: "Moved to inbox via API", opts: opts)
+        conversation_action(
+          id: id,
+          patch_attrs: { add_to_inbox: true },
+          post_attrs: { add_to_inbox: true },
+          defaults: { title: "Moved to inbox", text: "Moved to inbox via API" },
+          opts: opts
+        )
       end
 
       # Move a conversation to a team inbox
@@ -435,11 +576,11 @@ module Missive
       def add_to_team_inbox(id:, team:, **opts)
         validate_id!(id)
         validate_present!(team, name: "team")
-        post_action(
+        conversation_action(
           id: id,
-          action: :add_to_team_inbox,
-          default_title: "Moved to team inbox",
-          default_text: "Moved to team inbox via API",
+          patch_attrs: { add_to_team_inbox: true },
+          post_attrs: { add_to_team_inbox: true },
+          defaults: { title: "Moved to team inbox", text: "Moved to team inbox via API" },
           opts: opts.merge(team: team)
         )
       end
@@ -488,8 +629,58 @@ module Missive
       # their own `notification:` in `**opts`.
       DEFAULT_ACTION_NOTIFICATION_BODY = "via Missive API"
 
+      # Internal: pick the route for a conversation state change and dispatch.
+      #
+      # `PATCH /conversations/:id` (Missive, 2026-06-19) changes state
+      # silently. `POST /posts` changes state AND drops a comment in the
+      # thread — which also means it surfaces the conversation for everyone
+      # who had it closed. PATCH is therefore the default; the posts route is
+      # taken only when the caller asked for a visible trace, either by
+      # supplying post content or by passing `via: :post`.
+      #
+      # @param id [String] Conversation ID
+      # @param patch_attrs [Hash] Attrs to send on the PATCH route
+      # @param post_attrs [Hash] Attrs to send on the posts route (differs from
+      #   patch_attrs for :reopen — see {#reopen})
+      # @param defaults [Hash] :title and :text defaults for the posts route
+      # @param opts [Hash] Caller-supplied additional attrs, plus optional :via
+      # @return [Array<Missive::Object>, Missive::Object] Updated conversations
+      #   or the created post
+      # @raise [ArgumentError] On an unknown :via, or post content with via: :patch
+      def conversation_action(id:, patch_attrs:, post_attrs:, defaults:, opts: {})
+        opts = opts.transform_keys(&:to_sym)
+        via = opts.delete(:via)
+        content_keys = opts.keys & POST_CONTENT_KEYS
+
+        return update(ids: id, **patch_attrs, **opts) if resolve_route(via, content_keys) == :patch
+
+        post_action(id: id, attrs: post_attrs, defaults: defaults, opts: opts)
+      end
+
+      # Internal: :patch unless the caller asked for a visible trace.
+      def resolve_route(via, content_keys)
+        case (via || :auto).to_sym
+        when :auto
+          content_keys.empty? ? :patch : :post
+        when :post
+          :post
+        when :patch
+          raise_post_only_keys!(content_keys)
+          :patch
+        else
+          raise ArgumentError, "via must be one of :auto, :patch, :post (got #{via.inspect})"
+        end
+      end
+
+      def raise_post_only_keys!(content_keys)
+        return if content_keys.empty?
+
+        raise ArgumentError,
+              "#{content_keys.join(", ")} only apply to the posts route — drop them or pass via: :post"
+      end
+
       # Internal: dispatch a single conversation-action POST /posts call
-      # with the right action attr, organization passthrough, and sensible
+      # with the right action attrs, organization passthrough, and sensible
       # defaults for the two fields Missive's API requires on every post:
       #
       #   1. `notification: {title, body}` — required on every POST /v1/posts.
@@ -501,19 +692,62 @@ module Missive
       # `attachments:`, or `notification:` to override the defaults.
       #
       # @param id [String] Conversation ID
-      # @param action [Symbol] Action attr key (e.g. :close, :add_shared_labels)
-      # @param action_value [Object] Action attr value (defaults to true for booleans)
-      # @param default_title [String] Default notification title if caller omits one
-      # @param default_text [String] Default text body if caller didn't supply text/markdown/attachments
+      # @param attrs [Hash] Action attrs (e.g. {close: true})
+      # @param defaults [Hash] :title for the notification and :text for the body,
+      #   each used only when the caller supplied no equivalent
       # @param opts [Hash] Caller-supplied additional attrs
       # @return [Missive::Object] The created post
-      def post_action(id:, action:, default_title:, default_text:, action_value: true, opts: {})
+      def post_action(id:, attrs:, defaults:, opts: {})
         merged = opts.dup
-        merged[:notification] ||= { title: default_title, body: DEFAULT_ACTION_NOTIFICATION_BODY }
-        unless merged[:text] || merged[:markdown] || merged[:attachments]
-          merged[:text] = default_text
+        merged[:notification] ||= { title: defaults[:title], body: DEFAULT_ACTION_NOTIFICATION_BODY }
+        merged[:text] = defaults[:text] unless merged[:text] || merged[:markdown] || merged[:attachments]
+        client.posts.create(conversation: id, **attrs, **merged)
+      end
+
+      # Internal: coerce a String/Array of conversation IDs to a validated Array
+      def normalize_ids(ids)
+        list = ids.is_a?(Array) ? ids : [ids]
+        raise ArgumentError, "ids cannot be empty" if list.empty?
+
+        list.each_with_index do |id, index|
+          raise ArgumentError, "ids[#{index}] is required" if id.nil? || id.to_s.strip.empty?
         end
-        client.posts.create(conversation: id, action => action_value, **merged)
+
+        list.map { |id| id.to_s.strip }
+      end
+
+      # Internal: validate and normalize one entry of an update_each payload
+      def normalize_update_entry(entry)
+        raise ArgumentError, "each conversation must be a Hash" unless entry.is_a?(Hash)
+
+        normalized = entry.transform_keys(&:to_sym)
+        id = normalized[:id]
+        raise ArgumentError, "each conversation requires an id" if id.nil? || id.to_s.strip.empty?
+
+        attrs = normalized.except(:id)
+        raise ArgumentError, "conversation #{id} has no attributes to update" if attrs.empty?
+
+        validate_organization_dependencies!(attrs.keys, normalized[:organization])
+
+        normalized.merge(id: id.to_s.strip)
+      end
+
+      # Internal: Missive requires `organization` alongside the attrs that
+      # reference org-scoped records (users, assignees, shared labels).
+      def validate_organization_dependencies!(keys, organization)
+        dependent = keys & ORGANIZATION_DEPENDENT_ATTRS
+        return if dependent.empty?
+        return unless organization.nil? || organization.to_s.strip.empty?
+
+        raise ArgumentError, "organization is required when setting #{dependent.join(", ")}"
+      end
+
+      # Internal: Missive resolves merged conversation IDs server-side, so two
+      # distinct IDs in one request can still collide. We can only catch the
+      # exact-duplicate case, which the API rejects outright.
+      def validate_unique_ids!(id_list)
+        duplicates = id_list.tally.select { |_, count| count > 1 }.keys
+        raise ArgumentError, "duplicate conversation ids: #{duplicates.join(", ")}" if duplicates.any?
       end
 
       # Validate param combinations for list method

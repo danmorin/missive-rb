@@ -230,24 +230,25 @@ end
 
 #### Conversation Actions
 
-Missive's REST API mutates conversation state through `POST /posts` (or `POST /conversations/:id/merge` for merges) rather than dedicated `PATCH` endpoints. The gem exposes first-class methods that wrap the right call:
+Missive offers two ways to change conversation state: `PATCH /conversations/:id`, which changes it silently, and `POST /posts`, which changes it *and* leaves a visible comment explaining what triggered the change. The gem defaults to PATCH and switches to the posts route as soon as you supply post content:
 
 ```ruby
-# Close / reopen
+# Close / reopen — silent by default
 client.conversations.close(id: "conv-123")
-client.conversations.close(id: "conv-123", text: "Resolved.") # with a closing comment
+client.conversations.close(id: "conv-123", text: "Resolved.") # posts a closing comment
 client.conversations.reopen(id: "conv-123")
 
 # Shared labels (label IDs, not names)
-client.conversations.add_labels(id: "conv-123", labels: ["lbl-1", "lbl-2"])
-client.conversations.remove_labels(id: "conv-123", labels: ["lbl-1"])
+client.conversations.add_labels(id: "conv-123", labels: ["lbl-1", "lbl-2"], organization: "org-1")
+client.conversations.remove_labels(id: "conv-123", labels: ["lbl-1"], organization: "org-1")
 
-# Assign users (organization is required by the API)
+# Assign / unassign users (organization is required by the API)
 client.conversations.assign(
   id: "conv-123",
   users: ["user-1", "user-2"],
   organization: "org-1"
 )
+client.conversations.unassign(id: "conv-123", users: ["user-1"], organization: "org-1")
 
 # Move between inboxes
 client.conversations.add_to_inbox(id: "conv-123")
@@ -257,7 +258,34 @@ client.conversations.add_to_team_inbox(id: "conv-123", team: "team-1")
 client.conversations.merge(id: "src-123", target: "dst-456", subject: "Combined thread")
 ```
 
-Each action method (except `merge`) accepts arbitrary `**opts` that pass through to `POST /posts` — useful for attaching a comment, notification, or any other field Missive supports alongside the state change.
+Prefer the posts route when the change should be auditable in the thread — pass `text:`/`markdown:` (or `via: :post` for the gem's default filler text) and the action becomes a post with a notification attached. Prefer the default PATCH route for housekeeping: a post counts as new activity, so labeling or assigning through it pulls closed conversations back into everyone's inbox.
+
+##### Bulk updates
+
+`#update` hits `PATCH /conversations/:id,:id2,:id3` directly and takes any attrs the endpoint supports, for one conversation or a whole batch:
+
+```ruby
+# One conversation, several changes at once
+client.conversations.update(ids: "conv-123", close: true, subject: "Refund approved")
+
+# A triage batch in a single request
+client.conversations.update(
+  ids: %w[conv-1 conv-2 conv-3],
+  close: true,
+  add_shared_labels: ["lbl-resolved"],
+  organization: "org-1"
+)
+
+# Different attrs per conversation
+client.conversations.update_each(conversations: [
+  { id: "conv-1", close: true },
+  { id: "conv-2", subject: "Renamed" }
+])
+```
+
+Supported attrs: `subject`, `color`, `conversation_color`, `organization`, `team`, `force_team`, `add_users`, `add_assignees`, `remove_assignees`, `add_shared_labels`, `remove_shared_labels`, `add_to_inbox`, `add_to_team_inbox`, `close`, `reopen`. Missive requires `organization` alongside `add_users`, `add_assignees`, `remove_assignees` and `add_shared_labels`; the gem enforces that before the request goes out.
+
+There is no `archive` attr — Missive does not expose archiving through the REST API at all. `close`, `add_to_inbox` and trash/junk state are the only inbox states the API reaches.
 
 **Not exposed**: archive, snooze, mark read/unread, and `remove_assignees` — Missive's REST API does not document endpoints for these operations.
 

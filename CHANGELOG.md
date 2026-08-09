@@ -1,5 +1,53 @@
 ## [Unreleased]
 
+## [0.2.8]
+
+### Added
+
+- **`Resources::Conversations#update(ids:, **attrs)`** and
+  **`#update_each(conversations:)`** wrap `PATCH /v1/conversations/:id`,
+  the endpoint Missive shipped on 2026-06-19 for changing conversation
+  state without creating a post. Both accept a comma-list of IDs, so a
+  whole triage batch can be closed/labeled/assigned in one request.
+  Supported attrs: `subject`, `color`, `conversation_color`,
+  `organization`, `team`, `force_team`, `add_users`, `add_assignees`,
+  `remove_assignees`, `add_shared_labels`, `remove_shared_labels`,
+  `add_to_inbox`, `add_to_team_inbox`, `close`, `reopen`.
+- **`Resources::Conversations#unassign(id:, users:, organization:)`** —
+  the `remove_assignees` counterpart to `#assign`.
+
+### Changed (behavioural — conversation state actions)
+
+`#close`, `#reopen`, `#add_labels`, `#remove_labels`, `#assign`,
+`#add_to_inbox` and `#add_to_team_inbox` now route through PATCH by
+default instead of `POST /posts`. Each one previously fabricated a
+notification and a filler comment ("Labels added via API") because the
+posts endpoint rejects metadata-only posts — so every state change left
+visible noise in the thread and, per Missive's docs, a post reopens a
+closed conversation. Labeling or assigning a closed thread therefore
+dragged it back into everyone's inbox.
+
+- The posts route is still available and is selected automatically when
+  the caller supplies post content (`:text`, `:markdown`, `:attachments`,
+  `:notification`, `:username`, `:username_icon`, `:conversation_icon`)
+  or passes `via: :post` explicitly. `close(id:, text: "Resolved.")`
+  behaves exactly as it did in v0.2.7.
+- Passing post content together with `via: :patch` now raises
+  `ArgumentError` rather than silently dropping the content.
+- **Return type depends on the route**: the PATCH route returns
+  `Array<Missive::Object>` (the updated conversations); the posts route
+  still returns the single created post.
+
+### Fixed
+
+- **`#reopen` no longer sends `reopen: true` on the posts route.** On
+  `POST /posts` that attr means the opposite of what the method name
+  promises — Missive documents it as "prevents closed conversations from
+  reopening when creating a post" — so through v0.2.7 `#reopen` posted a
+  comment and then explicitly kept the conversation closed. A plain post
+  already reopens a closed conversation, so the posts route now sends no
+  `reopen` attr at all and only the PATCH route sends `reopen: true`.
+
 ## [0.2.7]
 
 ### Fixed (breaking — Contacts)
